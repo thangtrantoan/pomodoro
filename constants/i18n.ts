@@ -1,0 +1,259 @@
+import type { Lang } from '../types';
+
+/** "Third of four in this set" — design dùng số thứ tự viết chữ cho vị trí phiên */
+function ordinal(n: number): string {
+  return (
+    ['Zeroth', 'First', 'Second', 'Third', 'Fourth', 'Fifth', 'Sixth', 'Seventh'][n] ?? `#${n}`
+  );
+}
+
+/**
+ * Chuỗi `en` lấy nguyên văn từ design `Interval - Pomodoro.dc.html` — không viết lại.
+ * Thêm chuỗi mới phải thêm vào CẢ `vi` và `en`.
+ */
+const en = {
+  notFound: {
+    title: "This screen doesn't exist.",
+    home: 'Go to the timer',
+  },
+  common: {
+    cancel: 'Cancel',
+    close: 'Close',
+    confirm: 'Confirm',
+    delete: 'Delete',
+    add: 'Add',
+    save: 'Save',
+  },
+  onboarding: {
+    brand: 'Interval',
+    title: 'Twenty-five\nminutes.\nThen five.',
+    body: 'No projects, no tags, no scoring. One task at a time and one button. Everything else is a setting you will set once.',
+    begin: 'Begin',
+    metaLengths: (focus: number, short: number, long: number) => `${focus} / ${short} / ${long}`,
+    metaPerSet: (n: number) => `${n} per set`,
+    metaChange: 'Change in settings',
+  },
+  timer: {
+    session: (n: number, total: number) => `Session ${n} of ${total}`,
+    queue: 'Queue',
+    record: 'Record',
+    settings: 'Set',
+    focusing: 'Focusing',
+    ready: 'Ready',
+    paused: 'Paused',
+    start: 'Start',
+    pause: 'Pause',
+    resume: 'Resume',
+    endEarly: 'End session early',
+    changeTask: 'Change task',
+    noTask: 'No task selected',
+    pickTask: 'Tap to pick one from the queue',
+    estimated: (done: number, total: number) => `${done} of ${total} estimated`,
+    noEstimate: 'no estimate',
+  },
+  break: {
+    kicker: 'Break',
+    kickerLong: 'Long break',
+    body: 'Stand up. Look at something further than six metres away. The next session starts on its own.',
+    bodyManual:
+      'Stand up. Look at something further than six metres away. Start the next session when you are ready.',
+    bodyLong: 'A longer one — the set is done. Walk away from the screen before the next set.',
+    skip: 'Skip break',
+  },
+  done: {
+    title: 'Session logged.',
+    // Tách đôi để tên việc tô màu `text` nổi trên câu màu `textSecondary` — đúng design
+    bodyBefore: (duration: string) => `${duration} against `,
+    bodyAfter: '.',
+    position: (n: number, total: number) => `${ordinal(n)} of ${asWord(total)} in this set.`,
+    takeBreak: (minutes: number) => `Take the ${minutes}-minute break`,
+    endSet: 'End set for today',
+    sessionsToday: 'Sessions today',
+    focusedToday: 'Focused today',
+    dayStreak: 'Day streak',
+    interruptions: 'Interruptions',
+  },
+  queue: {
+    kicker: 'Queue',
+    addTask: 'Add task',
+    newTask: 'New task',
+    taskName: 'What are you working on?',
+    empty: 'Nothing in the queue yet.',
+    emptyHint: 'Add one task — the one you would do next.',
+    deleteTitle: 'Delete task',
+    count: (done: number, estimate: number | null) =>
+      estimate === null ? `${done}` : `${done}/${estimate}`,
+  },
+  record: {
+    kicker: 'Record',
+    focusedToday: 'Focused today',
+    dayStreak: 'Day streak',
+    lastSeven: 'Last 7 days',
+    sessionsWeek: 'Sessions this week',
+    focusedWeek: 'Focused this week',
+    medianSession: 'Median session',
+    completed: 'Sessions completed',
+    days: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
+    empty: 'No sessions logged yet.',
+  },
+  settings: {
+    kicker: 'Settings',
+    focusLength: 'Focus length',
+    minutes: (n: number) => `${n}m`,
+    autoStart: 'Start next session automatically',
+    autoStartHint: 'No decision at the break boundary',
+    chime: 'End chime',
+    chimeHint: 'A single tone, no voice',
+    ongoing: 'Lock screen timer',
+    ongoingHint: 'An ongoing notification while you focus',
+    language: 'Language',
+    footer: 'Interval 1.0 · Data stays on the device.',
+  },
+  music: {
+    kicker: 'Sound',
+    section: 'Background music',
+    off: 'Off',
+    empty: 'No tracks bundled yet.',
+    emptyHint: 'Drop an .mp3 into assets/audio/ and declare it in constants/tracks.ts.',
+    volume: 'Volume',
+    credits: 'Music credits',
+    creditsKicker: 'Credits',
+    creditsIntro: 'Tracks bundled with this app, and the licence each one is used under.',
+    creditsEmpty: 'No bundled tracks require attribution.',
+    playsDuringFocus: 'Plays only while a focus session is running',
+  },
+  notification: {
+    focusDone: 'Session done',
+    focusDoneBody: (task: string) => `${task} — take the break.`,
+    breakDone: 'Break over',
+    breakDoneBody: 'Back to it.',
+    ongoing: 'Interval · focusing',
+    ongoingBody: (clock: string, task: string) => `${clock} · ${task}`,
+  },
+};
+
+/** Số đếm viết chữ cho "… of four in this set" — chỉ dùng ở bản `en` */
+function asWord(n: number): string {
+  return ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven'][n] ?? `${n}`;
+}
+
+const vi: typeof en = {
+  notFound: {
+    title: 'Màn hình này không tồn tại.',
+    home: 'Về màn đồng hồ',
+  },
+  common: {
+    cancel: 'Hủy',
+    close: 'Đóng',
+    confirm: 'Xác nhận',
+    delete: 'Xóa',
+    add: 'Thêm',
+    save: 'Lưu',
+  },
+  onboarding: {
+    brand: 'Interval',
+    title: 'Hai mươi lăm\nphút.\nRồi năm phút.',
+    body: 'Không dự án, không thẻ, không chấm điểm. Mỗi lần một việc và một cái nút. Mọi thứ còn lại là cài đặt bạn chỉ chỉnh một lần.',
+    begin: 'Bắt đầu',
+    metaLengths: (focus: number, short: number, long: number) => `${focus} / ${short} / ${long}`,
+    metaPerSet: (n: number) => `${n} phiên mỗi set`,
+    metaChange: 'Đổi trong cài đặt',
+  },
+  timer: {
+    session: (n: number, total: number) => `Phiên ${n} / ${total}`,
+    queue: 'Việc',
+    record: 'Thống kê',
+    settings: 'Cài',
+    focusing: 'Đang tập trung',
+    ready: 'Sẵn sàng',
+    paused: 'Tạm dừng',
+    start: 'Bắt đầu',
+    pause: 'Tạm dừng',
+    resume: 'Tiếp tục',
+    endEarly: 'Kết thúc phiên sớm',
+    changeTask: 'Đổi việc',
+    noTask: 'Chưa chọn việc',
+    pickTask: 'Chạm để chọn một việc từ danh sách',
+    estimated: (done: number, total: number) => `${done} / ${total} ước lượng`,
+    noEstimate: 'chưa ước lượng',
+  },
+  break: {
+    kicker: 'Nghỉ',
+    kickerLong: 'Nghỉ dài',
+    body: 'Đứng dậy. Nhìn ra xa hơn sáu mét. Phiên tiếp theo sẽ tự bắt đầu.',
+    bodyManual: 'Đứng dậy. Nhìn ra xa hơn sáu mét. Bắt đầu phiên sau khi bạn sẵn sàng.',
+    bodyLong: 'Nghỉ dài hơn — hết một set rồi. Rời màn hình một lát trước khi vào set mới.',
+    skip: 'Bỏ qua nghỉ',
+  },
+  done: {
+    title: 'Đã ghi phiên.',
+    bodyBefore: (duration: string) => `${duration} cho `,
+    bodyAfter: '.',
+    position: (n: number, total: number) => `Phiên ${n} / ${total} của set này.`,
+    takeBreak: (minutes: number) => `Nghỉ ${minutes} phút`,
+    endSet: 'Kết thúc set hôm nay',
+    sessionsToday: 'Phiên hôm nay',
+    focusedToday: 'Tập trung hôm nay',
+    dayStreak: 'Chuỗi ngày',
+    interruptions: 'Lần gián đoạn',
+  },
+  queue: {
+    kicker: 'Việc',
+    addTask: 'Thêm việc',
+    newTask: 'Việc mới',
+    taskName: 'Bạn đang làm gì?',
+    empty: 'Chưa có việc nào.',
+    emptyHint: 'Thêm một việc — việc bạn sẽ làm tiếp theo.',
+    deleteTitle: 'Xóa việc',
+    count: (done: number, estimate: number | null) =>
+      estimate === null ? `${done}` : `${done}/${estimate}`,
+  },
+  record: {
+    kicker: 'Thống kê',
+    focusedToday: 'Tập trung hôm nay',
+    dayStreak: 'Chuỗi ngày',
+    lastSeven: '7 ngày gần nhất',
+    sessionsWeek: 'Phiên tuần này',
+    focusedWeek: 'Tập trung tuần này',
+    medianSession: 'Phiên trung vị',
+    completed: 'Phiên hoàn thành',
+    days: ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'],
+    empty: 'Chưa ghi phiên nào.',
+  },
+  settings: {
+    kicker: 'Cài đặt',
+    focusLength: 'Độ dài phiên',
+    minutes: (n: number) => `${n}p`,
+    autoStart: 'Tự bắt đầu phiên tiếp theo',
+    autoStartHint: 'Không phải quyết định gì lúc hết giờ nghỉ',
+    chime: 'Chuông báo hết phiên',
+    chimeHint: 'Một tiếng duy nhất, không giọng đọc',
+    ongoing: 'Đồng hồ trên màn khóa',
+    ongoingHint: 'Thông báo thường trực khi đang tập trung',
+    language: 'Ngôn ngữ',
+    footer: 'Interval 1.0 · Dữ liệu nằm trên máy bạn.',
+  },
+  music: {
+    kicker: 'Âm thanh',
+    section: 'Nhạc nền',
+    off: 'Tắt',
+    empty: 'Chưa có bản nhạc nào.',
+    emptyHint: 'Bỏ file .mp3 vào assets/audio/ rồi khai vào constants/tracks.ts.',
+    volume: 'Âm lượng',
+    credits: 'Nguồn nhạc',
+    creditsKicker: 'Nguồn',
+    creditsIntro: 'Các bản nhạc đi kèm app và giấy phép tương ứng.',
+    creditsEmpty: 'Không có bản nhạc nào bắt ghi credit.',
+    playsDuringFocus: 'Chỉ phát khi đang chạy phiên tập trung',
+  },
+  notification: {
+    focusDone: 'Hết phiên',
+    focusDoneBody: (task: string) => `${task} — nghỉ một chút.`,
+    breakDone: 'Hết giờ nghỉ',
+    breakDoneBody: 'Quay lại làm việc thôi.',
+    ongoing: 'Interval · đang tập trung',
+    ongoingBody: (clock: string, task: string) => `${clock} · ${task}`,
+  },
+};
+
+export const translations: Record<Lang, typeof en> = { vi, en };

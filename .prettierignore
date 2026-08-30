@@ -1,0 +1,5 @@
+package-lock.json
+# Task logs & docs — không format lại để giữ git history sạch
+*.md
+# Config Expo — không tự ý sửa
+app.json
