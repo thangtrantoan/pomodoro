@@ -50,7 +50,10 @@ import type { Track } from '../types';
  * Mọi track khai ở đây tự động hiện ở màn credit `app/licenses.tsx`.
  */
 const TRACK_SOURCES = {
-  'study-lofi': require('../assets/audio/alex-morgan-study-lofi-music-548638.mp3'),
+  // Bản đã nén: 96kbps mono, 2.0MB (gốc 256kbps stereo, 5.31MB). Nhạc nền chạy ở
+  // 25–40% âm lượng phía sau phiên tập trung nên 256kbps là thừa; loa điện thoại
+  // vốn cũng đã mono.
+  'study-lofi': require('../assets/audio/alex-morgan-study-lofi-548638-96k-mono.mp3'),
 } satisfies Record<string, number>;
 
 /**
