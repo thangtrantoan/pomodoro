@@ -66,6 +66,7 @@ export default function SettingsRoute() {
     { key: 'autoStart', label: t.settings.autoStart, hint: t.settings.autoStartHint },
     { key: 'chime', label: t.settings.chime, hint: t.settings.chimeHint },
     { key: 'ongoing', label: t.settings.ongoing, hint: t.settings.ongoingHint },
+    { key: 'keepAwake', label: t.settings.keepAwake, hint: t.settings.keepAwakeHint },
   ];
 
   const handleFocusLength = (value: string) => {

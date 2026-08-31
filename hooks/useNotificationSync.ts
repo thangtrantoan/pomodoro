@@ -7,6 +7,7 @@ import { formatClock } from '../utils/time';
 import {
   cancelSessionEnd,
   clearOngoing,
+  configureNotificationHandler,
   ensurePermissions,
   scheduleSessionEnd,
   sessionEndCopy,
@@ -28,6 +29,7 @@ export function useNotificationSync(): void {
   const taskName = tasks.find((task) => task.id === currentTaskId)?.name ?? t.timer.noTask;
 
   useEffect(() => {
+    configureNotificationHandler();
     void ensurePermissions();
   }, []);
 

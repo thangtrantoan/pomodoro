@@ -22,13 +22,12 @@ export const FOCUS_LENGTHS: readonly FocusMinutes[] = [15, 25, 45, 50] as const;
 /**
  * Các công tắc trong Settings — mỗi cái nối vào một hành vi thật, xem utils/notifications.ts.
  *
- * Design có thêm 2 công tắc không dựng được trong Expo managed nên đã bỏ, không làm
+ * Design có thêm 1 công tắc không dựng được trong Expo managed nên đã bỏ, không làm
  * công tắc chết:
  * - "Silence notifications": muốn tắt thông báo toàn máy phải có quyền
  *   ACCESS_NOTIFICATION_POLICY (Android DND), không expose trong Expo managed.
- * - "Keep screen awake": cần `expo-keep-awake` — chưa được duyệt thêm dependency.
  */
-export type FlagKey = 'autoStart' | 'chime' | 'ongoing';
+export type FlagKey = 'autoStart' | 'chime' | 'ongoing' | 'keepAwake';
 
 export type Flags = Record<FlagKey, boolean>;
 
