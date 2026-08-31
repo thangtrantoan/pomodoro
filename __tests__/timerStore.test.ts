@@ -18,7 +18,7 @@ beforeEach(() => {
     shortBreakMinutes: 5,
     longBreakMinutes: 15,
     sessionsPerSet: 4,
-    flags: { autoStart: true, chime: true, ongoing: true },
+    flags: { autoStart: true, chime: true, ongoing: true, keepAwake: true },
   });
   useStatsStore.setState({ sessions: [] });
   useTaskStore.setState({ tasks: [], currentTaskId: null });
@@ -167,7 +167,7 @@ describe('timerStore — vòng phiên trong set', () => {
 
   it('tắt autoStart thì hết nghỉ chỉ dừng ở trạng thái sẵn sàng', () => {
     useSettingsStore.setState({
-      flags: { autoStart: false, chime: true, ongoing: true },
+      flags: { autoStart: false, chime: true, ongoing: true, keepAwake: true },
     });
     useTimerStore.setState({ sessionNo: 1 });
     useTimerStore.getState().startBreak();

@@ -106,6 +106,8 @@ const en = {
     chimeHint: 'A single tone, no voice',
     ongoing: 'Lock screen timer',
     ongoingHint: 'An ongoing notification while you focus',
+    keepAwake: 'Keep screen awake',
+    keepAwakeHint: "Screen won't sleep while a session is running",
     language: 'Language',
     footer: 'Interval 1.0 · Data stays on the device.',
   },
@@ -128,7 +130,7 @@ const en = {
     breakDone: 'Break over',
     breakDoneBody: 'Back to it.',
     ongoing: 'Interval · focusing',
-    ongoingBody: (clock: string, task: string) => `${clock} · ${task}`,
+    ongoingBody: (task: string) => `Session running · ${task}`,
   },
 };
 
@@ -230,6 +232,8 @@ const vi: typeof en = {
     chimeHint: 'Một tiếng duy nhất, không giọng đọc',
     ongoing: 'Đồng hồ trên màn khóa',
     ongoingHint: 'Thông báo thường trực khi đang tập trung',
+    keepAwake: 'Giữ sáng màn hình',
+    keepAwakeHint: 'Màn hình không tự tắt khi đang chạy phiên',
     language: 'Ngôn ngữ',
     footer: 'Interval 1.0 · Dữ liệu nằm trên máy bạn.',
   },
@@ -252,7 +256,7 @@ const vi: typeof en = {
     breakDone: 'Hết giờ nghỉ',
     breakDoneBody: 'Quay lại làm việc thôi.',
     ongoing: 'Interval · đang tập trung',
-    ongoingBody: (clock: string, task: string) => `${clock} · ${task}`,
+    ongoingBody: (task: string) => `Đang chạy phiên · ${task}`,
   },
 };
 

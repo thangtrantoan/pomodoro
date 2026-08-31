@@ -18,6 +18,27 @@ const CHANNEL_ONGOING = 'interval-ongoing';
 /** Id cố định: mỗi lần cập nhật là ghi đè, không đẻ thêm thông báo mới */
 const ONGOING_ID = 'interval-ongoing-timer';
 
+let handlerConfigured = false;
+
+/**
+ * Không set handler thì expo-notifications mặc định **không hiện lẫn không phát âm
+ * thanh** bất kỳ notification nào trong khi JS thread còn sống — kể cả app đang chạy
+ * nền (chưa bị kill hẳn), không chỉ lúc foreground. Thiếu dòng này là lý do đồng hồ
+ * thường trực không hiện và tiếng báo hết phiên im lặng, dù lịch đã hẹn đúng.
+ */
+export function configureNotificationHandler(): void {
+  if (handlerConfigured) return;
+  handlerConfigured = true;
+  Notifications.setNotificationHandler({
+    handleNotification: async () => ({
+      shouldShowBanner: true,
+      shouldShowList: true,
+      shouldPlaySound: true,
+      shouldSetBadge: false,
+    }),
+  });
+}
+
 let channelsReady = false;
 
 export async function ensureChannels(): Promise<void> {

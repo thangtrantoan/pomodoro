@@ -10,6 +10,7 @@ import { nocturneColors } from '../constants/colors';
 import { useStoresHydrated } from '../hooks/useHydrated';
 import { useNotificationSync } from '../hooks/useNotificationSync';
 import { useBackgroundMusic } from '../hooks/useBackgroundMusic';
+import { useKeepAwakeSync } from '../hooks/useKeepAwakeSync';
 
 /**
  * Nocturne là hệ dark thuần nên chỉ có một theme Paper. Map token Nocturne vào
@@ -63,6 +64,7 @@ function AppShell() {
   useNotificationSync();
   // Nhạc nền phải sống ngoài mọi route — chuyển sang Queue/Record không được ngắt nhạc
   useBackgroundMusic();
+  useKeepAwakeSync();
 
   return (
     <Stack

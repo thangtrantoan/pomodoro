@@ -11,6 +11,7 @@ const DEFAULT_FLAGS: Flags = {
   autoStart: true,
   chime: true,
   ongoing: true,
+  keepAwake: true,
 };
 
 interface SettingsState {
