@@ -130,7 +130,7 @@ const en = {
     breakDone: 'Break over',
     breakDoneBody: 'Back to it.',
     ongoing: 'Interval · focusing',
-    ongoingBody: (clock: string, task: string) => `${clock} · ${task}`,
+    ongoingBody: (task: string) => `Session running · ${task}`,
   },
 };
 
@@ -256,7 +256,7 @@ const vi: typeof en = {
     breakDone: 'Hết giờ nghỉ',
     breakDoneBody: 'Quay lại làm việc thôi.',
     ongoing: 'Interval · đang tập trung',
-    ongoingBody: (clock: string, task: string) => `${clock} · ${task}`,
+    ongoingBody: (task: string) => `Đang chạy phiên · ${task}`,
   },
 };
 
