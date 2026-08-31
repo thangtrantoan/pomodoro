@@ -1,5 +1,6 @@
 import { ScrollViewStyleReset } from 'expo-router/html';
 import type { ReactNode } from 'react';
+import { nocturneColors } from '../constants/colors';
 
 // This file is web-only and used to configure the root HTML for every
 // web page during static rendering.
@@ -19,7 +20,9 @@ export default function Root({ children }: { children: ReactNode }) {
         */}
         <ScrollViewStyleReset />
 
-        {/* Using raw CSS styles as an escape-hatch to ensure the background color never flickers in dark-mode. */}
+        {/* Raw CSS escape-hatch để nền web không chớp trắng trước khi React mount.
+            Không gọi được `useColors()` ở đây (file chạy trong Node lúc static render)
+            nên đọc thẳng token — vẫn là token, không phải hex viết tay. */}
         <style dangerouslySetInnerHTML={{ __html: responsiveBackground }} />
         {/* Add any additional <head> elements that you want globally available on web... */}
       </head>
@@ -30,10 +33,5 @@ export default function Root({ children }: { children: ReactNode }) {
 
 const responsiveBackground = `
 body {
-  background-color: #fff;
-}
-@media (prefers-color-scheme: dark) {
-  body {
-    background-color: #000;
-  }
+  background-color: ${nocturneColors.background};
 }`;
