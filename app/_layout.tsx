@@ -10,6 +10,7 @@ import { nocturneColors } from '../constants/colors';
 import { useStoresHydrated } from '../hooks/useHydrated';
 import { useNotificationSync } from '../hooks/useNotificationSync';
 import { useBackgroundMusic } from '../hooks/useBackgroundMusic';
+import { useSessionChime } from '../hooks/useSessionChime';
 import { useKeepAwakeSync } from '../hooks/useKeepAwakeSync';
 
 /**
@@ -64,6 +65,8 @@ function AppShell() {
   useNotificationSync();
   // Nhạc nền phải sống ngoài mọi route — chuyển sang Queue/Record không được ngắt nhạc
   useBackgroundMusic();
+  // Chuông hết phiên cũng vậy: phiên có thể kết thúc lúc user đang ở màn Queue
+  useSessionChime();
   useKeepAwakeSync();
 
   return (

@@ -70,11 +70,29 @@ export async function ensurePermissions(): Promise<boolean> {
 
 /** Id của thông báo hết phiên đang hẹn — huỷ khi user pause hoặc kết thúc sớm */
 let scheduledEndId: string | null = null;
+/** Mốc đã hẹn của `scheduledEndId` — để biết lịch đó còn "chưa tới" hay đã tới hạn */
+let scheduledEndAt: number | null = null;
 
+/**
+ * Huỷ lịch báo hết phiên — nhưng **không** huỷ khi đã tới mốc đã hẹn.
+ *
+ * Hết giờ tự nhiên cũng chính là lúc `status` rời khỏi `'running'`, nên huỷ vô điều kiện
+ * là app tự tay gỡ đúng cái thông báo nó vừa hẹn: tick 500ms của `useCountdown` phát hiện
+ * hết giờ rồi `useNotificationSync` gọi vào đây, tất cả xảy ra trong vòng nửa giây sau
+ * `endAt`. Hệ điều hành thường chưa kịp bắn alarm trong khoảng đó — trên Android 12+ mà
+ * thiếu quyền `SCHEDULE_EXACT_ALARM` thì expo-notifications rơi xuống alarm inexact
+ * (`setAndAllowWhileIdle`), trễ vài giây tới vài phút — nên app luôn thắng cuộc đua và
+ * không bao giờ có tiếng nào.
+ *
+ * Đã qua mốc thì buông cho hệ điều hành bắn nốt, chỉ quên id đi.
+ */
 export async function cancelSessionEnd(): Promise<void> {
   if (scheduledEndId === null) return;
   const id = scheduledEndId;
+  const dueAt = scheduledEndAt;
   scheduledEndId = null;
+  scheduledEndAt = null;
+  if (dueAt !== null && Date.now() >= dueAt) return;
   await Notifications.cancelScheduledNotificationAsync(id).catch(() => {});
 }
 
@@ -105,6 +123,25 @@ export async function scheduleSessionEnd(opts: {
       channelId: CHANNEL_ALERT,
     },
   });
+  scheduledEndAt = opts.endAt;
+}
+
+/**
+ * Chạy `callback` mỗi lần thông báo hết phiên được hệ điều hành bắn ra, kèm hàm gỡ đăng ký.
+ *
+ * Đây là cú đánh thức duy nhất từ native khi user **không bật nhạc nền**: lúc màn hình
+ * tắt thì React Native đã gỡ hết JS timer, `useCountdown` đứng hình, không có gì phát
+ * hiện ra phiên đã hết. Alarm bắn thì receiver của expo-notifications chạy trong đúng
+ * process này và đẩy sự kiện lên JS — bám vào đó để `sync()` một nhịp.
+ *
+ * Lọc theo `kind` để bỏ qua thông báo đồng hồ thường trực, thứ được post lại nhiều lần
+ * trong một phiên.
+ */
+export function onSessionEndDelivered(callback: () => void): () => void {
+  const sub = Notifications.addNotificationReceivedListener((event) => {
+    if (event.request.content.data.kind === 'session-end') callback();
+  });
+  return () => sub.remove();
 }
 
 /**

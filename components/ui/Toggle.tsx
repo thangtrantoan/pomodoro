@@ -15,13 +15,15 @@ interface Props {
   hint: string;
   value: boolean;
   onToggle: () => void;
+  /** Công tắc vẫn ở đó nhưng lúc này không có tác dụng — làm mờ và chặn bấm */
+  disabled?: boolean;
 }
 
 /**
  * Hàng cài đặt có công tắc. Design vẽ công tắc riêng 38x22 (viền + núm 14px trượt),
  * không phải `Switch` của Paper — dùng Switch sẽ ra Material, lạc khỏi hệ Nocturne.
  */
-export function Toggle({ label, hint, value, onToggle }: Props) {
+export function Toggle({ label, hint, value, onToggle, disabled = false }: Props) {
   const c = useColors();
   const progress = useSharedValue(value ? 1 : 0);
 
@@ -41,10 +43,11 @@ export function Toggle({ label, hint, value, onToggle }: Props) {
 
   return (
     <Pressable
-      style={[styles.row, { borderTopColor: c.border }]}
+      style={[styles.row, disabled && styles.rowDisabled, { borderTopColor: c.border }]}
       onPress={onToggle}
+      disabled={disabled}
       accessibilityRole="switch"
-      accessibilityState={{ checked: value }}
+      accessibilityState={{ checked: value, disabled }}
       accessibilityLabel={label}
       accessibilityHint={hint}
     >
@@ -68,6 +71,7 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.lg,
     borderTopWidth: StyleSheet.hairlineWidth,
   },
+  rowDisabled: { opacity: 0.4 },
   text: { flex: 1 },
   label: { fontSize: 14 },
   hint: { marginTop: 3 },

@@ -88,6 +88,14 @@ export function TimerScreen() {
   // Chưa động vào phiên thì nút phụ là "đổi việc"; đã chạy rồi thì là "kết thúc sớm"
   const canEndEarly = running || !untouched;
 
+  // Việc chưa chạy phiên nào thì không có gì để nói — ẩn hẳn dòng meta
+  const taskMeta =
+    task === null
+      ? t.timer.pickTask
+      : task.completed > 0
+        ? t.timer.sessionsDone(task.completed)
+        : null;
+
   const chrome = [
     { label: t.timer.queue, go: () => router.push('/queue') },
     { label: t.timer.record, go: () => router.push('/record') },
@@ -156,13 +164,7 @@ export function TimerScreen() {
           <Text style={s.taskName} numberOfLines={2}>
             {task?.name ?? t.timer.noTask}
           </Text>
-          <Text style={s.taskMeta}>
-            {task === null
-              ? t.timer.pickTask
-              : task.estimate === null
-                ? t.timer.noEstimate
-                : t.timer.estimated(task.completed, task.estimate)}
-          </Text>
+          {taskMeta !== null && <Text style={s.taskMeta}>{taskMeta}</Text>}
         </Pressable>
       </View>
 

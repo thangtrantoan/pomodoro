@@ -7,7 +7,7 @@ import type { AppColors } from '../../constants/colors';
 
 interface Props {
   name: string;
-  meta: string;
+  meta?: string;
   count: string;
   active: boolean;
   onPress: () => void;
@@ -58,7 +58,7 @@ export function TaskRow({ name, meta, count, active, onPress, onLongPress }: Pro
         <Text style={[s.name, active ? s.nameActive : s.nameIdle]} numberOfLines={1}>
           {name}
         </Text>
-        <Text style={s.meta}>{meta}</Text>
+        {meta !== undefined && <Text style={s.meta}>{meta}</Text>}
       </View>
       <Text style={[s.count, numeral]}>{count}</Text>
     </Pressable>

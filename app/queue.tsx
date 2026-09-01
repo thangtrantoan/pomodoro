@@ -57,12 +57,7 @@ export default function QueueRoute() {
         renderItem={({ item }) => (
           <TaskRow
             name={item.name}
-            meta={
-              item.estimate === null
-                ? t.timer.noEstimate
-                : t.timer.estimated(item.completed, item.estimate)
-            }
-            count={t.queue.count(item.completed, item.estimate)}
+            count={String(item.completed)}
             active={item.id === currentTaskId}
             onPress={() => pick(item.id)}
             onLongPress={() => setPendingDelete(item)}
@@ -99,9 +94,9 @@ export default function QueueRoute() {
         title={t.queue.deleteTitle}
         itemTitle={pendingDelete?.name ?? ''}
         subtitle={
-          pendingDelete === null
-            ? undefined
-            : t.queue.count(pendingDelete.completed, pendingDelete.estimate)
+          pendingDelete !== null && pendingDelete.completed > 0
+            ? t.timer.sessionsDone(pendingDelete.completed)
+            : undefined
         }
         onDismiss={() => setPendingDelete(null)}
         onConfirm={() => {
