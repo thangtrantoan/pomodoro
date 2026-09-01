@@ -16,6 +16,13 @@ import { useStatsStore } from './statsStore';
  * `remainingMs` là nguồn sự thật khi KHÔNG chạy (idle/paused/completed);
  * `endAt` là nguồn sự thật khi đang chạy.
  */
+/**
+ * Ngưỡng để coi một phiên là "vừa mới hết giờ". Tick của `useCountdown` là 500ms nên
+ * bình thường `sync()` phát hiện trễ dưới nửa giây; trễ hơn nhiều nghĩa là app vừa ngủ
+ * dậy và mốc kết thúc đã trôi qua từ lâu.
+ */
+const FRESH_END_MS = 2_000;
+
 interface TimerState {
   phase: Phase;
   status: TimerStatus;
@@ -29,6 +36,14 @@ interface TimerState {
   sessionNo: number;
   /** Thời lượng phiên vừa kết thúc — màn Done hiển thị lại con số này */
   lastSessionMs: number;
+  /**
+   * Tăng một nhịp mỗi lần một phiên kết thúc **do hết giờ** — không tính kết thúc sớm
+   * hay skip thủ công. `hooks/useSessionChime.ts` bám vào đây để phát chuông.
+   *
+   * Là số đếm chứ không phải cờ boolean: hai phiên liên tiếp cùng kết thúc thì cờ giữ
+   * nguyên giá trị `true`, hook sẽ không thấy có gì thay đổi.
+   */
+  endedTick: number;
 
   /** Tính lại từ đồng hồ hệ thống; tự xử lý khi phiên đã hết giờ lúc app đang ngủ */
   sync: () => void;
@@ -83,6 +98,7 @@ export const useTimerStore = create<TimerState>()(
       startedAt: null,
       sessionNo: 1,
       lastSessionMs: 0,
+      endedTick: 0,
 
       sync: () => {
         const { status, endAt, phase } = get();
@@ -94,20 +110,29 @@ export const useTimerStore = create<TimerState>()(
           return;
         }
 
+        // App ngủ qua mốc kết thúc rồi mới mở lại cũng chạy vào đây, nhưng lúc đó thông
+        // báo hệ thống đã kêu từ lâu — kêu thêm một tiếng ngay khi user mở app là thừa
+        const fresh = now - endAt < FRESH_END_MS;
+
         if (phase === 'focus') {
-          const { startedAt, plannedMs } = get();
+          const { startedAt, plannedMs, endedTick } = get();
           logFocusSession(startedAt ?? endAt - plannedMs, plannedMs, plannedMs, true);
           set({
             status: 'completed',
             endAt: null,
             remainingMs: 0,
             lastSessionMs: plannedMs,
+            endedTick: fresh ? endedTick + 1 : endedTick,
           });
+          // Bật autoBreak thì vào nghỉ luôn, không dừng ở màn Done. Đặt sau `set()` để
+          // phiên vừa xong đã ghi log và bắn tín hiệu chuông xong xuôi.
+          if (useSettingsStore.getState().flags.autoBreak) get().startBreak();
           return;
         }
 
         // Hết giờ nghỉ. Nếu app ngủ qua mốc này thì phiên focus mới tính từ *bây giờ*,
         // không tính từ mốc cũ — nếu không user sẽ mở app ra và thấy phiên đã trôi mất.
+        if (fresh) set({ endedTick: get().endedTick + 1 });
         get().skipBreak();
         if (useSettingsStore.getState().flags.autoStart) get().start();
       },
@@ -208,6 +233,19 @@ export const useTimerStore = create<TimerState>()(
     {
       name: 'timer-storage',
       storage: createJSONStorage(() => AsyncStorage),
+      // `endedTick` cố tình không persist: nó là tín hiệu tức thời, không phải state cần
+      // nhớ. Lưu xuống rồi thì lần mở app sau hook chime thấy số nhảy từ 0 lên giá trị
+      // cũ và kêu oan một tiếng.
+      partialize: (s) => ({
+        phase: s.phase,
+        status: s.status,
+        endAt: s.endAt,
+        remainingMs: s.remainingMs,
+        plannedMs: s.plannedMs,
+        startedAt: s.startedAt,
+        sessionNo: s.sessionNo,
+        lastSessionMs: s.lastSessionMs,
+      }),
       // `sync()` ngay khi đọc xong state cũ: app có thể đã tắt suốt cả phiên
       onRehydrateStorage: () => (state) => state?.sync(),
     },

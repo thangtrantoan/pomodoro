@@ -18,7 +18,7 @@ beforeEach(() => {
     shortBreakMinutes: 5,
     longBreakMinutes: 15,
     sessionsPerSet: 4,
-    flags: { autoStart: true, chime: true, ongoing: true, keepAwake: true },
+    flags: { autoStart: true, autoBreak: false, chime: true, ongoing: true, keepAwake: true },
   });
   useStatsStore.setState({ sessions: [] });
   useTaskStore.setState({ tasks: [], currentTaskId: null });
@@ -31,6 +31,7 @@ beforeEach(() => {
     startedAt: null,
     sessionNo: 1,
     lastSessionMs: 0,
+    endedTick: 0,
   });
 });
 
@@ -79,9 +80,7 @@ describe('timerStore — đồng hồ theo mốc tuyệt đối', () => {
 
   it('phiên hết giờ lúc app đang ngủ vẫn được ghi log khi mở lại', () => {
     useTaskStore.setState({
-      tasks: [
-        { id: 't1', name: 'Task', estimate: 3, completed: 0, createdAt: T0, archived: false },
-      ],
+      tasks: [{ id: 't1', name: 'Task', completed: 0, createdAt: T0, archived: false }],
       currentTaskId: 't1',
     });
 
@@ -167,7 +166,7 @@ describe('timerStore — vòng phiên trong set', () => {
 
   it('tắt autoStart thì hết nghỉ chỉ dừng ở trạng thái sẵn sàng', () => {
     useSettingsStore.setState({
-      flags: { autoStart: false, chime: true, ongoing: true, keepAwake: true },
+      flags: { autoStart: false, autoBreak: false, chime: true, ongoing: true, keepAwake: true },
     });
     useTimerStore.setState({ sessionNo: 1 });
     useTimerStore.getState().startBreak();
@@ -176,6 +175,76 @@ describe('timerStore — vòng phiên trong set', () => {
     useTimerStore.getState().sync();
 
     expect(useTimerStore.getState().status).toBe('idle');
+  });
+
+  it('bật autoBreak thì hết phiên focus là vào nghỉ luôn, không qua màn tổng kết', () => {
+    useSettingsStore.setState({
+      flags: { autoStart: true, autoBreak: true, chime: true, ongoing: true, keepAwake: true },
+    });
+    useTimerStore.getState().start();
+
+    advance(FOCUS + 400);
+    useTimerStore.getState().sync();
+
+    const s = useTimerStore.getState();
+    expect(s.phase).toBe('shortBreak');
+    expect(s.status).toBe('running');
+    expect(s.endAt).toBe(now + minutesToMs(5));
+    // Bỏ qua màn Done nhưng phiên vẫn phải được ghi log đầy đủ
+    expect(useStatsStore.getState().sessions).toHaveLength(1);
+  });
+});
+
+describe('timerStore — tín hiệu chuông hết phiên', () => {
+  it('hết giờ trong lúc app đang mở thì bắn tín hiệu', () => {
+    useTimerStore.getState().start();
+
+    // Tick 500ms của useCountdown phát hiện muộn hơn mốc một nhịp
+    advance(FOCUS + 400);
+    useTimerStore.getState().sync();
+
+    expect(useTimerStore.getState().endedTick).toBe(1);
+  });
+
+  it('app ngủ qua mốc rồi mới mở lại thì không bắn — thông báo hệ thống đã kêu rồi', () => {
+    useTimerStore.getState().start();
+
+    advance(FOCUS + minutesToMs(40));
+    useTimerStore.getState().sync();
+
+    const s = useTimerStore.getState();
+    expect(s.status).toBe('completed');
+    expect(s.endedTick).toBe(0);
+  });
+
+  it('kết thúc sớm là chủ ý của user, không bắn chuông', () => {
+    useTimerStore.getState().start();
+    advance(minutesToMs(9));
+    useTimerStore.getState().endEarly();
+
+    expect(useTimerStore.getState().endedTick).toBe(0);
+  });
+
+  it('hết giờ nghỉ cũng bắn tín hiệu', () => {
+    useTimerStore.setState({ sessionNo: 1 });
+    useTimerStore.getState().startBreak();
+
+    advance(minutesToMs(5) + 300);
+    useTimerStore.getState().sync();
+
+    expect(useTimerStore.getState().endedTick).toBe(1);
+  });
+
+  it('là số đếm nên hai phiên liên tiếp bắn hai lần phân biệt được', () => {
+    useTimerStore.getState().start();
+    advance(FOCUS + 100);
+    useTimerStore.getState().sync();
+
+    useTimerStore.getState().startBreak();
+    advance(minutesToMs(5) + 100);
+    useTimerStore.getState().sync();
+
+    expect(useTimerStore.getState().endedTick).toBe(2);
   });
 });
 

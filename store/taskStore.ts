@@ -12,7 +12,7 @@ interface TaskState {
   /** Task đang chạy phiên — null khi hàng đợi rỗng hoặc user chưa chọn */
   currentTaskId: string | null;
 
-  addTask: (name: string, estimate?: number | null) => string;
+  addTask: (name: string) => string;
   removeTask: (id: string) => void;
   renameTask: (id: string, name: string) => void;
   selectTask: (id: string) => void;
@@ -26,11 +26,10 @@ export const useTaskStore = create<TaskState>()(
       tasks: [],
       currentTaskId: null,
 
-      addTask: (name, estimate = null) => {
+      addTask: (name) => {
         const task: Task = {
           id: makeId(),
           name,
-          estimate,
           completed: 0,
           createdAt: Date.now(),
           archived: false,

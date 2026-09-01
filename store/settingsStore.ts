@@ -9,6 +9,7 @@ import type { FlagKey, Flags, FocusMinutes, Lang } from '../types';
  */
 const DEFAULT_FLAGS: Flags = {
   autoStart: true,
+  autoBreak: false,
   chime: true,
   ongoing: true,
   keepAwake: true,
@@ -47,10 +48,7 @@ export const useSettingsStore = create<SettingsState>()(
 
       flags: DEFAULT_FLAGS,
       toggleFlag: (key) =>
-        set((state) => ({
-          // Spread default trước — state persist từ bản cũ có thể thiếu key mới thêm
-          flags: { ...DEFAULT_FLAGS, ...state.flags, [key]: !(state.flags[key] ?? true) },
-        })),
+        set((state) => ({ flags: { ...state.flags, [key]: !state.flags[key] } })),
 
       hasOnboarded: false,
       setHasOnboarded: () => set({ hasOnboarded: true }),
@@ -58,6 +56,12 @@ export const useSettingsStore = create<SettingsState>()(
     {
       name: 'settings-storage',
       storage: createJSONStorage(() => AsyncStorage),
+      // Merge của zustand là merge nông: `flags` đọc từ máy thay nguyên object mặc định,
+      // nên cờ mới thêm về sau sẽ là `undefined` với bản đã cài từ trước. Vá lại ở đây.
+      merge: (persisted, current) => {
+        const saved = persisted as Partial<SettingsState>;
+        return { ...current, ...saved, flags: { ...DEFAULT_FLAGS, ...(saved.flags ?? {}) } };
+      },
     },
   ),
 );

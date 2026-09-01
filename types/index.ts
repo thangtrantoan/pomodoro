@@ -27,15 +27,13 @@ export const FOCUS_LENGTHS: readonly FocusMinutes[] = [15, 25, 45, 50] as const;
  * - "Silence notifications": muốn tắt thông báo toàn máy phải có quyền
  *   ACCESS_NOTIFICATION_POLICY (Android DND), không expose trong Expo managed.
  */
-export type FlagKey = 'autoStart' | 'chime' | 'ongoing' | 'keepAwake';
+export type FlagKey = 'autoStart' | 'autoBreak' | 'chime' | 'ongoing' | 'keepAwake';
 
 export type Flags = Record<FlagKey, boolean>;
 
 export interface Task {
   id: string;
   name: string;
-  /** Số pomodoro ước lượng, null = "no estimate" */
-  estimate: number | null;
   /** Số phiên focus đã hoàn thành cho task này */
   completed: number;
   createdAt: number;

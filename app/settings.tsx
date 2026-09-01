@@ -1,10 +1,12 @@
 import { useMemo } from 'react';
-import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Linking, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { Text } from 'react-native-paper';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '../hooks/useColors';
 import { useT } from '../hooks/useT';
+import { useNotificationPermission } from '../hooks/useNotificationPermission';
+import { musicPlayable } from '../hooks/useMusicActive';
 import { useSettingsStore } from '../store/settingsStore';
 import { useTimerStore } from '../store/timerStore';
 import { useAudioStore } from '../store/audioStore';
@@ -13,7 +15,7 @@ import { SegmentedControl } from '../components/ui/SegmentedControl';
 import { ChoiceRow } from '../components/ui/ChoiceRow';
 import { Toggle } from '../components/ui/Toggle';
 import { TRACKS } from '../constants/tracks';
-import { spacing, tracking, typography } from '../constants/theme';
+import { radius, spacing, tracking, typography } from '../constants/theme';
 import { FOCUS_LENGTHS, type FlagKey, type FocusMinutes, type Lang } from '../types';
 import type { AppColors } from '../constants/colors';
 
@@ -30,6 +32,15 @@ function makeStyles(c: AppColors) {
       marginBottom: spacing.md,
     },
     empty: { ...typography.hint, color: c.textFaint },
+    warning: {
+      marginHorizontal: spacing.xl,
+      marginTop: spacing.md,
+      padding: spacing.lg,
+      borderRadius: radius.md,
+      backgroundColor: c.dangerLight,
+    },
+    warningTitle: { ...typography.hint, color: c.danger, marginBottom: 6 },
+    warningBody: { ...typography.hint, color: c.textSecondary },
     emptyHint: { ...typography.hint, color: c.textGhost, marginTop: 6 },
     creditsRow: { paddingHorizontal: spacing.xl, paddingTop: spacing.lg },
     creditsLink: { ...typography.hint, color: c.accent400 },
@@ -39,6 +50,13 @@ function makeStyles(c: AppColors) {
 
 /** Âm lượng theo nấc rời — design không dùng slider ở đâu cả, mọi lựa chọn đều phân đoạn */
 const VOLUME_STEPS = [0.25, 0.5, 0.75, 1] as const;
+
+interface ToggleRow {
+  key: FlagKey;
+  label: string;
+  hint: string;
+  disabled?: boolean;
+}
 
 export default function SettingsRoute() {
   const c = useColors();
@@ -54,6 +72,7 @@ export default function SettingsRoute() {
   const flags = useSettingsStore((st) => st.flags);
   const toggleFlag = useSettingsStore((st) => st.toggleFlag);
   const applyToTimer = useTimerStore((st) => st.applyFocusLength);
+  const notificationsGranted = useNotificationPermission();
 
   const musicEnabled = useAudioStore((st) => st.enabled);
   const setMusicEnabled = useAudioStore((st) => st.setEnabled);
@@ -62,10 +81,32 @@ export default function SettingsRoute() {
   const volume = useAudioStore((st) => st.volume);
   const setVolume = useAudioStore((st) => st.setVolume);
 
-  const toggles: { key: FlagKey; label: string; hint: string }[] = [
+  // Nhạc nền bật là media notification của trình phát chiếm chỗ trên màn khoá, và
+  // `useNotificationSync` tự ẩn đồng hồ thường trực để không có hai dòng chồng nhau của
+  // cùng một app. Công tắc lúc đó không làm gì: làm mờ và nói thẳng lý do, thay vì để
+  // user gạt qua gạt lại rồi tưởng app hỏng.
+  const musicTakesOver = musicPlayable(musicEnabled, trackId);
+
+  // Đồng hồ thường trực là chuyện riêng của Android — iOS không cho app treo một thông
+  // báo không vuốt bỏ được (phải là Live Activity + code native, xem utils/notifications).
+  // Ẩn hẳn hàng này thay vì để một công tắc bật hay tắt cũng như nhau.
+  const ongoingRow: ToggleRow[] =
+    Platform.OS === 'android'
+      ? [
+          {
+            key: 'ongoing',
+            label: t.settings.ongoing,
+            hint: musicTakesOver ? t.settings.ongoingHintMusic : t.settings.ongoingHint,
+            disabled: musicTakesOver,
+          },
+        ]
+      : [];
+
+  const toggles: ToggleRow[] = [
     { key: 'autoStart', label: t.settings.autoStart, hint: t.settings.autoStartHint },
+    { key: 'autoBreak', label: t.settings.autoBreak, hint: t.settings.autoBreakHint },
     { key: 'chime', label: t.settings.chime, hint: t.settings.chimeHint },
-    { key: 'ongoing', label: t.settings.ongoing, hint: t.settings.ongoingHint },
+    ...ongoingRow,
     { key: 'keepAwake', label: t.settings.keepAwake, hint: t.settings.keepAwakeHint },
   ];
 
@@ -115,8 +156,23 @@ export default function SettingsRoute() {
             hint={item.hint}
             value={flags[item.key]}
             onToggle={() => toggleFlag(item.key)}
+            disabled={item.disabled}
           />
         ))}
+
+        {/* Các công tắc thông báo ở trên chỉ có tác dụng khi còn quyền. Mất quyền mà không
+            nói gì thì user gạt bật rồi tưởng app hỏng. */}
+        {notificationsGranted === false ? (
+          <Pressable
+            style={s.warning}
+            onPress={() => void Linking.openSettings()}
+            accessibilityRole="button"
+            accessibilityLabel={t.settings.notifBlocked}
+          >
+            <Text style={s.warningTitle}>{t.settings.notifBlocked}</Text>
+            <Text style={s.warningBody}>{t.settings.notifBlockedHint}</Text>
+          </Pressable>
+        ) : null}
 
         <View style={[s.block, { paddingTop: spacing.xl }]}>
           <Text style={s.label}>{t.music.section}</Text>
