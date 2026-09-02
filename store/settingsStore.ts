@@ -58,8 +58,15 @@ export const useSettingsStore = create<SettingsState>()(
       storage: createJSONStorage(() => AsyncStorage),
       // Merge của zustand là merge nông: `flags` đọc từ máy thay nguyên object mặc định,
       // nên cờ mới thêm về sau sẽ là `undefined` với bản đã cài từ trước. Vá lại ở đây.
+      //
+      // `persisted` là `undefined` khi trong máy CHƯA có gì — zustand vẫn gọi `merge` ở
+      // lần chạy đầu tiên (`hydrate()` trả `[false, void 0]` rồi đưa thẳng vào đây). Thiếu
+      // `?? {}` là ném TypeError, mà throw trong chuỗi hydrate thì persist nuốt vào
+      // `.catch`: `hasHydrated()` ở lại `false` vĩnh viễn và app treo màn đen ngay lần mở
+      // đầu tiên. Kiểu của `persisted` là `unknown` nên `as` không bắt được — xem
+      // `tasks/16-hydration-deadlock.md`.
       merge: (persisted, current) => {
-        const saved = persisted as Partial<SettingsState>;
+        const saved = (persisted ?? {}) as Partial<SettingsState>;
         return { ...current, ...saved, flags: { ...DEFAULT_FLAGS, ...(saved.flags ?? {}) } };
       },
     },
