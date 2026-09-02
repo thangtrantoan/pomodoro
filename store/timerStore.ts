@@ -246,8 +246,20 @@ export const useTimerStore = create<TimerState>()(
         sessionNo: s.sessionNo,
         lastSessionMs: s.lastSessionMs,
       }),
-      // `sync()` ngay khi đọc xong state cũ: app có thể đã tắt suốt cả phiên
-      onRehydrateStorage: () => (state) => state?.sync(),
+      // `sync()` ngay khi đọc xong state cũ: app có thể đã tắt suốt cả phiên.
+      //
+      // try/catch không phải cho vui: callback này chạy **bên trong** chuỗi promise
+      // hydrate của persist, và một throw ở đây rơi vào nhánh `.catch` — nhánh đó không
+      // đặt `hasHydrated` cũng không bắn `onFinishHydration`, nên cổng hydrate ở
+      // `useStoresHydrated` treo vĩnh viễn và app đứng màn đen câm. Một phiên cũ tính
+      // sai không đáng đổi bằng cả app.
+      onRehydrateStorage: () => (state) => {
+        try {
+          state?.sync();
+        } catch (e) {
+          console.error('[timerStore] sync() lúc rehydrate thất bại', e);
+        }
+      },
     },
   ),
 );
