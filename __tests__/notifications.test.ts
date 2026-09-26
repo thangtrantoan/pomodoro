@@ -1,5 +1,11 @@
 import * as Notifications from 'expo-notifications';
-import { cancelSessionEnd, onSessionEndDelivered, scheduleSessionEnd } from '../utils/notifications';
+import { AppState, type AppStateStatus } from 'react-native';
+import {
+  cancelSessionEnd,
+  configureNotificationHandler,
+  onSessionEndDelivered,
+  scheduleSessionEnd,
+} from '../utils/notifications';
 
 jest.mock('expo-notifications', () => ({
   SchedulableTriggerInputTypes: { DATE: 'date' },
@@ -8,10 +14,12 @@ jest.mock('expo-notifications', () => ({
   scheduleNotificationAsync: jest.fn().mockResolvedValue('scheduled-id'),
   cancelScheduledNotificationAsync: jest.fn().mockResolvedValue(undefined),
   addNotificationReceivedListener: jest.fn(),
+  setNotificationHandler: jest.fn(),
 }));
 
 const cancelMock = Notifications.cancelScheduledNotificationAsync as jest.Mock;
 const receivedMock = Notifications.addNotificationReceivedListener as jest.Mock;
+const handlerMock = Notifications.setNotificationHandler as jest.Mock;
 
 const T0 = 1_700_000_000_000;
 const SESSION_MS = 25 * 60 * 1000;
@@ -82,6 +90,50 @@ describe('cancelSessionEnd — không được huỷ đúng lúc phiên vừa h�
     await cancelSessionEnd();
 
     expect(cancelMock).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('configureNotificationHandler — hai tiếng báo không được đè nhau', () => {
+  /** Hàm `handleNotification` mà `configureNotificationHandler` đã đăng ký */
+  function handleNotification() {
+    configureNotificationHandler();
+    const config = handlerMock.mock.calls[0]?.[0] as
+      { handleNotification: (n: unknown) => Promise<{ shouldPlaySound: boolean }> } | undefined;
+    if (config === undefined) throw new Error('chưa set handler nào');
+    return config.handleNotification;
+  }
+
+  function setAppState(next: AppStateStatus) {
+    (AppState as { currentState: AppStateStatus }).currentState = next;
+  }
+
+  it('app đang mở thì notification im — chuông trong app đã kêu đúng khoảnh khắc đó', async () => {
+    const handle = handleNotification();
+    setAppState('active');
+
+    // Không tắt là hai tiếng: chime.wav từ useSessionChime, cộng tiếng của alarm bắn sau
+    // đó vài trăm ms (cancelSessionEnd cố ý không huỷ khi đã qua mốc hẹn)
+    await expect(handle({})).resolves.toMatchObject({ shouldPlaySound: false });
+  });
+
+  it('app ở nền thì notification là tiếng duy nhất còn lại', async () => {
+    const handle = handleNotification();
+    setAppState('background');
+
+    // Màn hình tắt là JS timer đã bị gỡ, chuông trong app không có gì kích hoạt
+    await expect(handle({})).resolves.toMatchObject({ shouldPlaySound: true });
+  });
+
+  it('banner vẫn hiện ở cả hai trạng thái — nó nói phiên nào vừa xong', async () => {
+    const handle = handleNotification();
+
+    for (const state of ['active', 'background'] as const) {
+      setAppState(state);
+      await expect(handle({})).resolves.toMatchObject({
+        shouldShowBanner: true,
+        shouldShowList: true,
+      });
+    }
   });
 });
 

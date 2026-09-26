@@ -9,7 +9,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { nocturneColors } from '../constants/colors';
 import { useStoresHydrated } from '../hooks/useHydrated';
 import { useNotificationSync } from '../hooks/useNotificationSync';
-import { useBackgroundMusic } from '../hooks/useBackgroundMusic';
+import { useSessionSound } from '../hooks/useSessionSound';
 import { useSessionChime } from '../hooks/useSessionChime';
 import { useKeepAwakeSync } from '../hooks/useKeepAwakeSync';
 
@@ -63,8 +63,9 @@ function makeNavTheme(): Theme {
 function AppShell() {
   // Gắn một lần ở root: lịch thông báo hết phiên + đồng hồ thường trực
   useNotificationSync();
-  // Nhạc nền phải sống ngoài mọi route — chuyển sang Queue/Record không được ngắt nhạc
-  useBackgroundMusic();
+  // Âm thanh trong phiên (nhạc nền hoặc tiếng tick) phải sống ngoài mọi route — chuyển sang
+  // Queue/Record không được ngắt tiếng
+  useSessionSound();
   // Chuông hết phiên cũng vậy: phiên có thể kết thúc lúc user đang ở màn Queue
   useSessionChime();
   useKeepAwakeSync();

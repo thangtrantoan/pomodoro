@@ -8,8 +8,12 @@ import type { FlagKey, Flags, FocusMinutes, Lang } from '../types';
  * Chỉ `focusMinutes` đổi được trong Settings (design chỉ vẽ 4 lựa chọn cho nó).
  */
 const DEFAULT_FLAGS: Flags = {
+  // Mặc định tắt: bản đã cài của user đang ở chế độ đầy đủ, một bản cập nhật không được
+  // tự tay rút gọn app của họ
+  basicMode: false,
   autoStart: true,
   autoBreak: false,
+  notify: true,
   chime: true,
   ongoing: true,
   keepAwake: true,

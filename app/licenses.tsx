@@ -39,17 +39,17 @@ export default function LicensesRoute() {
 
   return (
     <View style={[s.root, { paddingTop: spacing.lg + insets.top }]}>
-      <ScreenHeader title={t.music.creditsKicker} onClose={() => router.back()} style={s.header} />
+      <ScreenHeader title={t.sound.creditsKicker} onClose={() => router.back()} style={s.header} />
 
       <ScrollView
         contentContainerStyle={[s.content, { paddingBottom: spacing.xxl + insets.bottom }]}
         showsVerticalScrollIndicator={false}
       >
         {TRACKS.length === 0 ? (
-          <Text style={s.empty}>{t.music.creditsEmpty}</Text>
+          <Text style={s.empty}>{t.sound.creditsEmpty}</Text>
         ) : (
           <>
-            <Text style={s.intro}>{t.music.creditsIntro}</Text>
+            <Text style={s.intro}>{t.sound.creditsIntro}</Text>
             {TRACKS.map((track) => (
               <View key={track.id} style={s.entry}>
                 <Text style={s.title}>{track.title}</Text>

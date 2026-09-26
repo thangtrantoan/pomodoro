@@ -1,5 +1,5 @@
 import * as Notifications from 'expo-notifications';
-import { Platform } from 'react-native';
+import { AppState, Platform } from 'react-native';
 import type { Phase } from '../types';
 
 /**
@@ -25,6 +25,24 @@ let handlerConfigured = false;
  * thanh** bất kỳ notification nào trong khi JS thread còn sống — kể cả app đang chạy
  * nền (chưa bị kill hẳn), không chỉ lúc foreground. Thiếu dòng này là lý do đồng hồ
  * thường trực không hiện và tiếng báo hết phiên im lặng, dù lịch đã hẹn đúng.
+ *
+ * ## Vì sao phải tắt tiếng khi app đang mở
+ *
+ * App có **hai** tiếng báo hết phiên, cố ý: `useSessionChime` phát `chime.wav` từ trong
+ * app (chắc chắn kêu khi app mở, không phụ thuộc quyền hay alarm), còn notification lo
+ * trường hợp màn hình đã tắt. Nhưng `cancelSessionEnd` không huỷ lịch khi đã qua mốc hẹn
+ * — đúng lúc hết giờ tự nhiên — nên khi app đang mở thì **cả hai** cùng kêu, lệch nhau
+ * đúng bằng độ trễ của alarm. Nghe ra hai tiếng đè nhau ở mọi mốc chuyển phiên.
+ *
+ * Nên chọn một: app `active` thì chuông trong app là tiếng chính, notification im (banner
+ * vẫn hiện — nó nói phiên nào vừa xong). Ra khỏi foreground thì ngược lại, notification là
+ * tiếng duy nhất còn lại.
+ *
+ * Chỉ coi `'active'` là foreground, không gộp `'inactive'`: `'inactive'` của iOS là trạng
+ * thái quá độ (vuốt notification center xuống chẳng hạn), không chắc chuông trong app kịp
+ * kêu — thà nghe thừa một tiếng còn hơn im hẳn ở mốc hết phiên.
+ *
+ * Cờ `chime` tắt thì cả hai đều im sẵn: `scheduleSessionEnd` đã truyền `sound: false`.
  */
 export function configureNotificationHandler(): void {
   if (handlerConfigured) return;
@@ -33,7 +51,7 @@ export function configureNotificationHandler(): void {
     handleNotification: async () => ({
       shouldShowBanner: true,
       shouldShowList: true,
-      shouldPlaySound: true,
+      shouldPlaySound: AppState.currentState !== 'active',
       shouldSetBadge: false,
     }),
   });
@@ -170,18 +188,26 @@ export async function clearOngoing(): Promise<void> {
   await Notifications.dismissNotificationAsync(ONGOING_ID).catch(() => {});
 }
 
-/** Tiêu đề/nội dung thông báo hết phiên tuỳ theo loại phiên vừa xong */
+/**
+ * Tiêu đề/nội dung thông báo hết phiên tuỳ theo loại phiên vừa xong.
+ *
+ * `taskName === null` là chế độ basic: không có việc nào để nhắc, nên dùng câu không có
+ * chỗ cắm tên việc — chứ không nhét chuỗi rỗng hay "Chưa chọn việc" vào câu cũ.
+ */
 export function sessionEndCopy(
   phase: Phase,
   t: {
     focusDone: string;
     focusDoneBody: (task: string) => string;
+    focusDoneBodyPlain: string;
     breakDone: string;
     breakDoneBody: string;
   },
-  taskName: string,
+  taskName: string | null,
 ): { title: string; body: string } {
-  return phase === 'focus'
-    ? { title: t.focusDone, body: t.focusDoneBody(taskName) }
-    : { title: t.breakDone, body: t.breakDoneBody };
+  if (phase !== 'focus') return { title: t.breakDone, body: t.breakDoneBody };
+  return {
+    title: t.focusDone,
+    body: taskName === null ? t.focusDoneBodyPlain : t.focusDoneBody(taskName),
+  };
 }

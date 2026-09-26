@@ -33,6 +33,7 @@ export function OnboardingScreen() {
   const shortBreakMinutes = useSettingsStore((st) => st.shortBreakMinutes);
   const longBreakMinutes = useSettingsStore((st) => st.longBreakMinutes);
   const sessionsPerSet = useSettingsStore((st) => st.sessionsPerSet);
+  const basicMode = useSettingsStore((st) => st.flags.basicMode);
   const setHasOnboarded = useSettingsStore((st) => st.setHasOnboarded);
 
   return (
@@ -49,13 +50,20 @@ export function OnboardingScreen() {
         {t.onboarding.begin}
       </Button>
 
+      {/* Dòng meta phải nói đúng cấu hình đang có: basic mode thì không có nghỉ dài lẫn set */}
       <View style={s.meta}>
         <Text style={s.metaText}>
-          {t.onboarding.metaLengths(focusMinutes, shortBreakMinutes, longBreakMinutes)}
+          {basicMode
+            ? t.onboarding.metaLengthsBasic(focusMinutes, shortBreakMinutes)
+            : t.onboarding.metaLengths(focusMinutes, shortBreakMinutes, longBreakMinutes)}
         </Text>
         <Text style={s.metaText}>·</Text>
-        <Text style={s.metaText}>{t.onboarding.metaPerSet(sessionsPerSet)}</Text>
-        <Text style={s.metaText}>·</Text>
+        {!basicMode && (
+          <>
+            <Text style={s.metaText}>{t.onboarding.metaPerSet(sessionsPerSet)}</Text>
+            <Text style={s.metaText}>·</Text>
+          </>
+        )}
         <Text style={s.metaText}>{t.onboarding.metaChange}</Text>
       </View>
     </View>

@@ -22,14 +22,59 @@ export const FOCUS_LENGTHS: readonly FocusMinutes[] = [15, 25, 45, 50] as const;
 /**
  * Các công tắc trong Settings — mỗi cái nối vào một hành vi thật, xem utils/notifications.ts.
  *
+ * `basicMode` là công tắc gộp, không phải một hành vi đơn: nó vừa bỏ cấu trúc set (không
+ * đếm phiên, không nghỉ dài) vừa ẩn phần việc cần làm. Hai thứ đó đi với nhau vì cùng trả
+ * lời một câu hỏi — "app này có nhiều hơn một đồng hồ hay không".
+ *
+ * `notify` tắt hẳn notification hết phiên, còn `chime` chỉ quyết định phiên đó có *tiếng*
+ * hay không. Tách đôi vì hai thứ chết theo hai cách khác nhau: tắt tiếng thì vẫn thấy
+ * banner trên màn khoá, tắt notification là mất luôn cú đánh thức native.
+ *
  * Design có thêm 1 công tắc không dựng được trong Expo managed nên đã bỏ, không làm
  * công tắc chết:
  * - "Silence notifications": muốn tắt thông báo toàn máy phải có quyền
  *   ACCESS_NOTIFICATION_POLICY (Android DND), không expose trong Expo managed.
  */
-export type FlagKey = 'autoStart' | 'autoBreak' | 'chime' | 'ongoing' | 'keepAwake';
+export type FlagKey =
+  'basicMode' | 'autoStart' | 'autoBreak' | 'notify' | 'chime' | 'ongoing' | 'keepAwake';
 
 export type Flags = Record<FlagKey, boolean>;
+
+/**
+ * Nguồn âm thanh phát trong phiên: một bản nhạc nền, hoặc một tiếng tick — **không bao giờ
+ * cả hai**.
+ *
+ * Trước đây là hai hệ song song (cờ `enabled` + `trackId` cho nhạc, `tickId` cho tick) nên
+ * bật cả hai được, và phải có một quy tắc trọng tài riêng để quyết định player nào giữ
+ * foreground service. Một lựa chọn duy nhất bỏ được cả hai chuyện đó.
+ */
+export type SoundKind = 'track' | 'tick';
+
+export interface SoundChoice {
+  kind: SoundKind;
+  /** id trong `TRACKS` hoặc trong `TICKS`, tuỳ `kind` */
+  id: string;
+}
+
+/**
+ * Ba tiếng tick đi kèm app. Là union chứ không phải `string` để `constants/i18n.ts` buộc
+ * phải có nhãn cho từng tiếng — thêm một tiếng mà quên dịch là TypeScript báo đỏ.
+ */
+export type TickId = 'soft' | 'clock' | 'wood';
+
+/**
+ * Một tiếng tick.
+ *
+ * Không có field giấy phép như `Track`: cả ba file đều do ffmpeg tổng hợp trong repo này
+ * (lệnh sinh ghi ở `assets/audio/README.md`), không có ai để ghi credit. Nhãn hiển thị
+ * nằm ở `t.sound.tickNames` chứ không ở đây — "Tick nhẹ" là chữ cần dịch, khác với tên riêng
+ * của một bản nhạc.
+ */
+export interface TickSound {
+  id: TickId;
+  /** Key trong `TICK_SOURCES` (constants/ticks.ts) trỏ tới file require() */
+  source: string;
+}
 
 export interface Task {
   id: string;

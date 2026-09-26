@@ -3,9 +3,29 @@ import { useSettingsStore } from '../store/settingsStore';
 import { useStatsStore } from '../store/statsStore';
 import { useTaskStore } from '../store/taskStore';
 import { minutesToMs } from '../utils/time';
+import type { Flags } from '../types';
 
 const FOCUS = minutesToMs(25);
 const T0 = 1_700_000_000_000;
+
+/**
+ * Mốc cờ mặc định cho mọi test. Các test chỉ ghi đè cờ chúng quan tâm qua `setFlags` —
+ * viết cả object ra từng chỗ là thêm một cờ mới thì ba chỗ cùng đỏ, mà chẳng test nào
+ * trong số đó nói về cờ mới.
+ */
+const BASE_FLAGS: Flags = {
+  basicMode: false,
+  autoStart: true,
+  autoBreak: false,
+  notify: true,
+  chime: true,
+  ongoing: true,
+  keepAwake: true,
+};
+
+function setFlags(overrides: Partial<Flags>) {
+  useSettingsStore.setState({ flags: { ...BASE_FLAGS, ...overrides } });
+}
 
 let now = T0;
 
@@ -18,7 +38,7 @@ beforeEach(() => {
     shortBreakMinutes: 5,
     longBreakMinutes: 15,
     sessionsPerSet: 4,
-    flags: { autoStart: true, autoBreak: false, chime: true, ongoing: true, keepAwake: true },
+    flags: BASE_FLAGS,
   });
   useStatsStore.setState({ sessions: [] });
   useTaskStore.setState({ tasks: [], currentTaskId: null });
@@ -165,9 +185,7 @@ describe('timerStore — vòng phiên trong set', () => {
   });
 
   it('tắt autoStart thì hết nghỉ chỉ dừng ở trạng thái sẵn sàng', () => {
-    useSettingsStore.setState({
-      flags: { autoStart: false, autoBreak: false, chime: true, ongoing: true, keepAwake: true },
-    });
+    setFlags({ autoStart: false });
     useTimerStore.setState({ sessionNo: 1 });
     useTimerStore.getState().startBreak();
 
@@ -178,9 +196,7 @@ describe('timerStore — vòng phiên trong set', () => {
   });
 
   it('bật autoBreak thì hết phiên focus là vào nghỉ luôn, không qua màn tổng kết', () => {
-    useSettingsStore.setState({
-      flags: { autoStart: true, autoBreak: true, chime: true, ongoing: true, keepAwake: true },
-    });
+    setFlags({ autoBreak: true });
     useTimerStore.getState().start();
 
     advance(FOCUS + 400);
@@ -192,6 +208,39 @@ describe('timerStore — vòng phiên trong set', () => {
     expect(s.endAt).toBe(now + minutesToMs(5));
     // Bỏ qua màn Done nhưng phiên vẫn phải được ghi log đầy đủ
     expect(useStatsStore.getState().sessions).toHaveLength(1);
+  });
+});
+
+describe('timerStore — chế độ basic (không set, không phiên)', () => {
+  it('phiên cuối set vẫn chỉ là nghỉ ngắn', () => {
+    setFlags({ basicMode: true });
+    useTimerStore.setState({ sessionNo: 4 });
+    useTimerStore.getState().startBreak();
+
+    const s = useTimerStore.getState();
+    expect(s.phase).toBe('shortBreak');
+    expect(s.plannedMs).toBe(minutesToMs(5));
+  });
+
+  it('hết nghỉ không đếm sang phiên kế tiếp', () => {
+    setFlags({ basicMode: true });
+    useTimerStore.setState({ sessionNo: 1, phase: 'shortBreak' });
+    useTimerStore.getState().skipBreak();
+
+    const s = useTimerStore.getState();
+    expect(s.sessionNo).toBe(1);
+    expect(s.phase).toBe('focus');
+    expect(s.remainingMs).toBe(FOCUS);
+  });
+
+  it('đang ở giữa set rồi bật basic thì bộ đếm về 1 sau phiên nghỉ kế tiếp', () => {
+    // Tắt công tắc đi mà `sessionNo` còn đứng ở 3 thì user thấy "Phiên 3 / 4" nhảy ra
+    // giữa không khí — không có phiên 1, 2 nào cả
+    setFlags({ basicMode: true });
+    useTimerStore.setState({ sessionNo: 3, phase: 'shortBreak' });
+    useTimerStore.getState().skipBreak();
+
+    expect(useTimerStore.getState().sessionNo).toBe(1);
   });
 });
 

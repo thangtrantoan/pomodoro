@@ -1,8 +1,10 @@
-import React, { useMemo } from 'react';
+import React, { useEffect, useMemo } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { Text } from 'react-native-paper';
+import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useAutoHide } from '../../hooks/useAutoHide';
 import { useColors } from '../../hooks/useColors';
 import { useT } from '../../hooks/useT';
 import { useTimerStore } from '../../store/timerStore';
@@ -20,10 +22,16 @@ import type { AppColors } from '../../constants/colors';
 const RING_SIZE = 264;
 const GLOW_INSET = 26;
 
+/** Mờ dần đủ nhanh để không thành hiệu ứng, đủ chậm để không giật */
+const FADE_MS = 220;
+
 function makeStyles(c: AppColors) {
   return StyleSheet.create({
     root: { flex: 1, paddingHorizontal: spacing.xl, paddingTop: spacing.lg },
     header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+    // Basic mode không có kicker phiên ở bên trái — `space-between` với một con duy nhất
+    // sẽ đẩy nhóm nút sang trái, phải ghim lại về phải
+    headerBasic: { justifyContent: 'flex-end' },
     chrome: { flexDirection: 'row', gap: spacing.xs },
     chromeBtn: {
       minWidth: 40,
@@ -76,6 +84,7 @@ export function TimerScreen() {
   const endEarly = useTimerStore((st) => st.endEarly);
 
   const sessionsPerSet = useSettingsStore((st) => st.sessionsPerSet);
+  const basicMode = useSettingsStore((st) => st.flags.basicMode);
   const tasks = useTaskStore((st) => st.tasks);
   const currentTaskId = useTaskStore((st) => st.currentTaskId);
 
@@ -96,11 +105,25 @@ export function TimerScreen() {
         ? t.timer.sessionsDone(task.completed)
         : null;
 
+  // Basic mode bỏ hẳn phần việc cần làm — bỏ luôn cửa vào nó
   const chrome = [
-    { label: t.timer.queue, go: () => router.push('/queue') },
+    ...(basicMode ? [] : [{ label: t.timer.queue, go: () => router.push('/queue') }]),
     { label: t.timer.record, go: () => router.push('/record') },
     { label: t.timer.settings, go: () => router.push('/settings') },
   ];
+
+  // Nút phụ chỉ còn một việc trong basic mode. Chưa chạy phiên nào thì không có gì để
+  // kết thúc sớm — ẩn hẳn thay vì để một nút bấm vào không làm gì.
+  const showSecondary = canEndEarly || !basicMode;
+
+  // Đang chạy thì hai nút ở đáy tự mờ đi sau 10s; chạm vào màn hình là hiện lại
+  const { visible: controlsVisible, reveal } = useAutoHide(running);
+
+  const fade = useSharedValue(1);
+  useEffect(() => {
+    fade.value = withTiming(controlsVisible ? 1 : 0, { duration: FADE_MS });
+  }, [controlsVisible, fade]);
+  const footerFade = useAnimatedStyle(() => ({ opacity: fade.value }));
 
   const handleToggle = () => {
     tapFeedback();
@@ -117,14 +140,20 @@ export function TimerScreen() {
   };
 
   return (
-    <View
+    // Vùng chạm phủ cả màn để hiện lại hai nút. `accessible={false}` để screen reader không
+    // đọc cả màn hình thành một cái nút — các phần tử con vẫn focus được bình thường.
+    // Chạm vào một Pressable con (hàng nút trên, tên việc, hai nút ở đáy) thì con giữ
+    // responder và `onPress` này không chạy, nên không có cú chạm nào bị tính hai lần.
+    <Pressable
+      accessible={false}
+      onPress={reveal}
       style={[
         s.root,
         { paddingTop: spacing.lg + insets.top, paddingBottom: spacing.xxl + insets.bottom },
       ]}
     >
-      <View style={s.header}>
-        <Kicker>{t.timer.session(sessionNo, sessionsPerSet)}</Kicker>
+      <View style={[s.header, basicMode && s.headerBasic]}>
+        {!basicMode && <Kicker>{t.timer.session(sessionNo, sessionsPerSet)}</Kicker>}
         <View style={s.chrome}>
           {chrome.map((item) => (
             <Pressable
@@ -155,28 +184,41 @@ export function TimerScreen() {
           </ProgressRing>
         </View>
 
-        <Pressable
-          style={s.task}
-          onPress={() => router.push('/queue')}
-          accessibilityRole="button"
-          accessibilityLabel={task?.name ?? t.timer.noTask}
-        >
-          <Text style={s.taskName} numberOfLines={2}>
-            {task?.name ?? t.timer.noTask}
-          </Text>
-          {taskMeta !== null && <Text style={s.taskMeta}>{taskMeta}</Text>}
-        </Pressable>
+        {!basicMode && (
+          <Pressable
+            style={s.task}
+            onPress={() => router.push('/queue')}
+            accessibilityRole="button"
+            accessibilityLabel={task?.name ?? t.timer.noTask}
+          >
+            <Text style={s.taskName} numberOfLines={2}>
+              {task?.name ?? t.timer.noTask}
+            </Text>
+            {taskMeta !== null && <Text style={s.taskMeta}>{taskMeta}</Text>}
+          </Pressable>
+        )}
       </View>
 
-      {/* CTA ghim ngoài vùng cuộn — màn nhỏ vẫn thấy */}
-      <View style={s.footer}>
+      {/* CTA ghim ngoài vùng cuộn — màn nhỏ vẫn thấy.
+          Mờ đi chứ không co chiều cao: layout đứng yên, vòng tiến trình không nhảy một nhịp
+          mỗi lần ẩn/hiện. Mờ rồi thì phải chặn chạm, nếu không nút Tạm dừng vô hình sẽ ăn
+          mất đúng cú chạm để hiện lại — và phải rời cây accessibility, không để screen
+          reader focus vào một nút bấm không ăn. */}
+      <Animated.View
+        style={[s.footer, footerFade]}
+        pointerEvents={controlsVisible ? 'auto' : 'none'}
+        accessibilityElementsHidden={!controlsVisible}
+        importantForAccessibility={controlsVisible ? 'auto' : 'no-hide-descendants'}
+      >
         <Button height={56} onPress={handleToggle}>
           {primaryLabel}
         </Button>
-        <Button variant="ghost" height={40} onPress={handleSecondary}>
-          {canEndEarly ? t.timer.endEarly : t.timer.changeTask}
-        </Button>
-      </View>
-    </View>
+        {showSecondary && (
+          <Button variant="ghost" height={40} onPress={handleSecondary}>
+            {canEndEarly ? t.timer.endEarly : t.timer.changeTask}
+          </Button>
+        )}
+      </Animated.View>
+    </Pressable>
   );
 }

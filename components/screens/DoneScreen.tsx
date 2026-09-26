@@ -45,6 +45,7 @@ export function DoneScreen() {
   const sessionsPerSet = useSettingsStore((st) => st.sessionsPerSet);
   const shortBreakMinutes = useSettingsStore((st) => st.shortBreakMinutes);
   const longBreakMinutes = useSettingsStore((st) => st.longBreakMinutes);
+  const basicMode = useSettingsStore((st) => st.flags.basicMode);
 
   const tasks = useTaskStore((st) => st.tasks);
   const currentTaskId = useTaskStore((st) => st.currentTaskId);
@@ -52,7 +53,9 @@ export function DoneScreen() {
 
   const taskName = tasks.find((item) => item.id === currentTaskId)?.name ?? t.timer.noTask;
   const stats = useMemo(() => deriveStats(sessions), [sessions]);
-  const isLongNext = sessionNo >= sessionsPerSet;
+  // Basic mode không có set thì không có nghỉ dài — phải khớp với `startBreak()` của store,
+  // nếu không nút hứa 15 phút mà đồng hồ chạy 5 phút
+  const isLongNext = !basicMode && sessionNo >= sessionsPerSet;
   const breakMinutes = isLongNext ? longBreakMinutes : shortBreakMinutes;
 
   const handleBreak = () => {
@@ -77,9 +80,15 @@ export function DoneScreen() {
         <AccentRule style={s.rule} />
         <Text style={s.title}>{t.done.title}</Text>
         <Text style={s.body}>
-          {t.done.bodyBefore(formatClock(lastSessionMs))}
-          <Text style={s.taskName}>{taskName}</Text>
-          {t.done.bodyAfter} {t.done.position(sessionNo, sessionsPerSet)}
+          {basicMode ? (
+            t.done.bodyBasic(formatClock(lastSessionMs))
+          ) : (
+            <>
+              {t.done.bodyBefore(formatClock(lastSessionMs))}
+              <Text style={s.taskName}>{taskName}</Text>
+              {t.done.bodyAfter} {t.done.position(sessionNo, sessionsPerSet)}
+            </>
+          )}
         </Text>
 
         <StatGrid
@@ -97,7 +106,7 @@ export function DoneScreen() {
           {t.done.takeBreak(breakMinutes)}
         </Button>
         <Button variant="ghost" height={40} onPress={handleEndSet}>
-          {t.done.endSet}
+          {basicMode ? t.done.endDay : t.done.endSet}
         </Button>
       </View>
     </View>

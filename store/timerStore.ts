@@ -178,8 +178,10 @@ export const useTimerStore = create<TimerState>()(
 
       startBreak: () => {
         const { sessionNo } = get();
-        const { sessionsPerSet } = useSettingsStore.getState();
-        const phase: Phase = sessionNo >= sessionsPerSet ? 'longBreak' : 'shortBreak';
+        const { sessionsPerSet, flags } = useSettingsStore.getState();
+        // Basic mode không có set thì cũng không có "hết set" — mọi phiên nghỉ là nghỉ ngắn
+        const phase: Phase =
+          !flags.basicMode && sessionNo >= sessionsPerSet ? 'longBreak' : 'shortBreak';
         const planned = breakMsFor(phase);
 
         set({
@@ -194,7 +196,7 @@ export const useTimerStore = create<TimerState>()(
 
       skipBreak: () => {
         const { phase, sessionNo } = get();
-        const { sessionsPerSet } = useSettingsStore.getState();
+        const { sessionsPerSet, flags } = useSettingsStore.getState();
         const planned = focusMs();
 
         set({
@@ -204,8 +206,13 @@ export const useTimerStore = create<TimerState>()(
           remainingMs: planned,
           endAt: null,
           startedAt: null,
-          // Sau nghỉ dài là hết set — quay về phiên 1
-          sessionNo: phase === 'longBreak' || sessionNo >= sessionsPerSet ? 1 : sessionNo + 1,
+          // Sau nghỉ dài là hết set — quay về phiên 1. Basic mode thì đứng yên ở 1: không
+          // đếm phiên nữa, và tắt công tắc đi cũng không thấy bộ đếm nhảy ra ở giữa set.
+          sessionNo: flags.basicMode
+            ? 1
+            : phase === 'longBreak' || sessionNo >= sessionsPerSet
+              ? 1
+              : sessionNo + 1,
         });
       },
 
