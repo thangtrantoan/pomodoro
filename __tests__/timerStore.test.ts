@@ -9,6 +9,15 @@ const FOCUS = minutesToMs(25);
 const T0 = 1_700_000_000_000;
 
 /**
+ * Mọi test về "hết hạn" phải mốc từ một giờ giữa ngày, không dùng `T0`: ở một số múi giờ
+ * `T0` rơi vào quãng 23:xx và mấy chục phút trôi trong test sẽ lén bước sang ngày mới, làm
+ * test đỏ ở máy này mà xanh ở máy khác.
+ */
+const NINE_AM = new Date(2023, 10, 15, 9, 0).getTime();
+/** Sáng hôm sau — cho các test "treo qua đêm" */
+const NEXT_MORNING = new Date(2023, 10, 16, 8, 0).getTime();
+
+/**
  * Mốc cờ mặc định cho mọi test. Các test chỉ ghi đè cờ chúng quan tâm qua `setFlags` —
  * viết cả object ra từng chỗ là thêm một cờ mới thì ba chỗ cùng đỏ, mà chẳng test nào
  * trong số đó nói về cờ mới.
@@ -51,6 +60,8 @@ beforeEach(() => {
     startedAt: null,
     sessionNo: 1,
     lastSessionMs: 0,
+    completedAt: null,
+    pausedAt: null,
     endedTick: 0,
   });
 });
@@ -105,7 +116,7 @@ describe('timerStore — đồng hồ theo mốc tuyệt đối', () => {
     });
 
     useTimerStore.getState().start();
-    advance(FOCUS + minutesToMs(40)); // mở lại app rất lâu sau khi hết giờ
+    advance(FOCUS + minutesToMs(5)); // mở lại app sau khi hết giờ, chưa quá hạn màn Done
     useTimerStore.getState().sync();
 
     const timer = useTimerStore.getState();
@@ -117,6 +128,9 @@ describe('timerStore — đồng hồ theo mốc tuyệt đối', () => {
     expect(sessions).toHaveLength(1);
     expect(sessions[0].completed).toBe(true);
     expect(sessions[0].durationMs).toBe(FOCUS);
+    // Ghi theo mốc hết giờ thật, không phải lúc user mở app lại — nếu không thì phiên của
+    // hôm qua bị tính vào "Tập trung hôm nay"
+    expect(sessions[0].endedAt).toBe(T0 + FOCUS);
     // Pomodoro được cộng cho đúng task đang chọn
     expect(useTaskStore.getState().tasks[0].completed).toBe(1);
   });
@@ -258,7 +272,7 @@ describe('timerStore — tín hiệu chuông hết phiên', () => {
   it('app ngủ qua mốc rồi mới mở lại thì không bắn — thông báo hệ thống đã kêu rồi', () => {
     useTimerStore.getState().start();
 
-    advance(FOCUS + minutesToMs(40));
+    advance(FOCUS + minutesToMs(5));
     useTimerStore.getState().sync();
 
     const s = useTimerStore.getState();
@@ -294,6 +308,222 @@ describe('timerStore — tín hiệu chuông hết phiên', () => {
     useTimerStore.getState().sync();
 
     expect(useTimerStore.getState().endedTick).toBe(2);
+  });
+});
+
+describe('timerStore — hạn của màn tổng kết phiên', () => {
+  beforeEach(() => {
+    now = NINE_AM;
+  });
+
+  /** Đưa store về đúng trạng thái "vừa xong phiên, đang ở màn Done" */
+  function completeSession() {
+    useTimerStore.getState().start();
+    advance(FOCUS + 400);
+    useTimerStore.getState().sync();
+    expect(useTimerStore.getState().status).toBe('completed');
+  }
+
+  it('mở lại app ngay sau phiên thì màn Done còn nguyên', () => {
+    completeSession();
+
+    // Đi nghỉ 15 phút rồi mở app lại — nút "Nghỉ" phải còn đó
+    advance(minutesToMs(15));
+    useTimerStore.getState().sync();
+
+    expect(useTimerStore.getState().status).toBe('completed');
+  });
+
+  it('quá hạn trong cùng ngày thì về trạng thái sẵn sàng của phiên kế tiếp', () => {
+    useTimerStore.setState({ sessionNo: 2 });
+    completeSession();
+
+    advance(minutesToMs(31));
+    useTimerStore.getState().sync();
+
+    const s = useTimerStore.getState();
+    expect(s.status).toBe('idle');
+    expect(s.phase).toBe('focus');
+    expect(s.remainingMs).toBe(FOCUS);
+    // Phiên nghỉ không ai bấm tính như đã nghỉ xong
+    expect(s.sessionNo).toBe(3);
+  });
+
+  it('quá hạn không tự chạy phiên mới dù bật autoStart — user phải tự bấm Bắt đầu', () => {
+    completeSession();
+
+    advance(minutesToMs(45));
+    useTimerStore.getState().sync();
+
+    expect(useTimerStore.getState().status).toBe('idle');
+  });
+
+  it('hết giờ lúc app đang ngủ quá lâu thì mở app ra thấy nút Bắt đầu, không phải tổng kết', () => {
+    useTimerStore.getState().start();
+
+    // Phiên hết giờ lúc 9:25, user mở app lại lúc 11:00 — nút "Nghỉ 5 phút" lúc này vô nghĩa
+    advance(FOCUS + minutesToMs(95));
+    useTimerStore.getState().sync();
+
+    const s = useTimerStore.getState();
+    expect(s.status).toBe('idle');
+    expect(s.sessionNo).toBe(2);
+
+    // Bỏ màn tổng kết nhưng phiên vẫn phải được ghi, và ghi theo mốc hết giờ thật
+    const sessions = useStatsStore.getState().sessions;
+    expect(sessions).toHaveLength(1);
+    expect(sessions[0].completed).toBe(true);
+    expect(sessions[0].endedAt).toBe(NINE_AM + FOCUS);
+  });
+
+  it('sang ngày mới thì hết hạn ngay cả khi chưa đủ 30 phút, và set về phiên 1', () => {
+    const lateNight = new Date(2023, 10, 15, 23, 55).getTime();
+    useTimerStore.setState({ status: 'completed', completedAt: lateNight, sessionNo: 2 });
+
+    now = lateNight + minutesToMs(10); // 00:05 hôm sau — mới 10 phút nhưng đã khác ngày
+    useTimerStore.getState().sync();
+
+    const s = useTimerStore.getState();
+    expect(s.status).toBe('idle');
+    expect(s.sessionNo).toBe(1);
+  });
+
+  it('bản cũ chưa lưu mốc kết thúc thì coi như đã quá hạn', () => {
+    useTimerStore.setState({ status: 'completed', completedAt: null, sessionNo: 3 });
+    useTimerStore.getState().sync();
+
+    const s = useTimerStore.getState();
+    expect(s.status).toBe('idle');
+    expect(s.sessionNo).toBe(1);
+  });
+
+  it('bấm Nghỉ thì mốc kết thúc được dọn, phiên nghỉ không bị hạn này đụng tới', () => {
+    completeSession();
+    useTimerStore.getState().startBreak();
+
+    expect(useTimerStore.getState().completedAt).toBeNull();
+
+    advance(minutesToMs(31));
+    useTimerStore.getState().sync();
+
+    // Hết nghỉ lúc app ngủ: vẫn là đường cũ của sync(), không phải đường hết hạn
+    expect(useTimerStore.getState().phase).toBe('focus');
+    expect(useTimerStore.getState().status).toBe('running');
+  });
+});
+
+describe('timerStore — hạn của phiên tạm dừng', () => {
+  beforeEach(() => {
+    now = NINE_AM;
+  });
+
+  /** Chạy 10 phút rồi bấm Tạm dừng */
+  function pauseMidSession() {
+    useTimerStore.getState().start();
+    advance(minutesToMs(10));
+    useTimerStore.getState().pause();
+    expect(useTimerStore.getState().remainingMs).toBe(minutesToMs(15));
+  }
+
+  it('tạm dừng cả buổi trong cùng ngày thì vẫn chờ user bấm Tiếp tục', () => {
+    pauseMidSession();
+
+    advance(minutesToMs(5 * 60)); // đi họp 5 tiếng, vẫn trong ngày
+    useTimerStore.getState().sync();
+
+    const s = useTimerStore.getState();
+    expect(s.status).toBe('paused');
+    expect(s.remainingMs).toBe(minutesToMs(15));
+    expect(useStatsStore.getState().sessions).toHaveLength(0);
+  });
+
+  it('tạm dừng từ hôm trước thì bỏ phiên, về phiên 1 sẵn sàng', () => {
+    useTimerStore.setState({ sessionNo: 3 });
+    pauseMidSession();
+
+    now = NEXT_MORNING;
+    useTimerStore.getState().sync();
+
+    const s = useTimerStore.getState();
+    expect(s.status).toBe('idle');
+    expect(s.phase).toBe('focus');
+    expect(s.remainingMs).toBe(FOCUS);
+    expect(s.sessionNo).toBe(1);
+    expect(s.pausedAt).toBeNull();
+  });
+
+  it('phần đã ngồi được ghi thành phiên gián đoạn của đúng ngày hôm đó', () => {
+    pauseMidSession();
+    const pausedAt = now;
+
+    now = NEXT_MORNING;
+    useTimerStore.getState().sync();
+
+    const sessions = useStatsStore.getState().sessions;
+    expect(sessions).toHaveLength(1);
+    expect(sessions[0].completed).toBe(false);
+    expect(sessions[0].durationMs).toBe(minutesToMs(10));
+    // 10 phút đó ngồi hôm qua thì phải nằm ở hôm qua, không nhảy sang ngày mở app lại
+    expect(sessions[0].endedAt).toBe(pausedAt);
+  });
+
+  it('bấm Bắt đầu rồi dừng ngay thì không ghi gì — chưa thành một phiên', () => {
+    useTimerStore.getState().start();
+    advance(30_000);
+    useTimerStore.getState().pause();
+
+    now = NEXT_MORNING;
+    useTimerStore.getState().sync();
+
+    expect(useStatsStore.getState().sessions).toHaveLength(0);
+    expect(useTimerStore.getState().status).toBe('idle');
+  });
+
+  it('phiên nghỉ treo qua đêm cũng về phiên focus sẵn sàng, và không vào log', () => {
+    useTimerStore.getState().startBreak();
+    advance(minutesToMs(2));
+    useTimerStore.getState().pause();
+
+    now = NEXT_MORNING;
+    useTimerStore.getState().sync();
+
+    const s = useTimerStore.getState();
+    expect(s.phase).toBe('focus');
+    expect(s.status).toBe('idle');
+    expect(s.remainingMs).toBe(FOCUS);
+    expect(useStatsStore.getState().sessions).toHaveLength(0);
+  });
+
+  it('bản cũ chưa có mốc tạm dừng thì suy ra từ mốc bắt đầu phiên', () => {
+    // Đúng cảnh update app giữa lúc đang có một phiên treo từ hôm trước
+    useTimerStore.setState({
+      status: 'paused',
+      startedAt: NINE_AM,
+      remainingMs: minutesToMs(15),
+      plannedMs: FOCUS,
+      pausedAt: null,
+    });
+
+    now = NEXT_MORNING;
+    useTimerStore.getState().sync();
+
+    expect(useTimerStore.getState().status).toBe('idle');
+    expect(useStatsStore.getState().sessions).toHaveLength(1);
+  });
+
+  it('không có mốc nào để suy thì để yên — không tự tay bỏ phiên của user', () => {
+    useTimerStore.setState({
+      status: 'paused',
+      startedAt: null,
+      pausedAt: null,
+      remainingMs: minutesToMs(15),
+    });
+
+    now = NEXT_MORNING;
+    useTimerStore.getState().sync();
+
+    expect(useTimerStore.getState().status).toBe('paused');
+    expect(useTimerStore.getState().remainingMs).toBe(minutesToMs(15));
   });
 });
 
