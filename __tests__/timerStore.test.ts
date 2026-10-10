@@ -212,6 +212,7 @@ describe('timerStore — vòng phiên trong set', () => {
   it('bật autoBreak thì hết phiên focus là vào nghỉ luôn, không qua màn tổng kết', () => {
     setFlags({ autoBreak: true });
     useTimerStore.getState().start();
+    const focusEnd = now + FOCUS;
 
     advance(FOCUS + 400);
     useTimerStore.getState().sync();
@@ -219,9 +220,86 @@ describe('timerStore — vòng phiên trong set', () => {
     const s = useTimerStore.getState();
     expect(s.phase).toBe('shortBreak');
     expect(s.status).toBe('running');
-    expect(s.endAt).toBe(now + minutesToMs(5));
+    // Mốc hết nghỉ tính từ lúc phiên focus hết, không phải từ lúc `sync()` phát hiện ra:
+    // tick 500ms nên hai mốc đó luôn lệch nhau một chút, và giờ nghỉ phải trôi theo đồng
+    // hồ thật. Xem test "mở app giữa khoảng nghỉ" cho trường hợp lệch nhiều.
+    expect(s.endAt).toBe(focusEnd + minutesToMs(5));
     // Bỏ qua màn Done nhưng phiên vẫn phải được ghi log đầy đủ
     expect(useStatsStore.getState().sessions).toHaveLength(1);
+  });
+});
+
+describe('timerStore — mốc chuyển phiên đã trôi qua lúc app ngủ', () => {
+  it('autoBreak: mở app giữa khoảng nghỉ thì chỉ còn phần nghỉ chưa trôi', () => {
+    setFlags({ autoBreak: true });
+    useTimerStore.getState().start();
+    const focusEnd = now + FOCUS;
+
+    // Phiên hết giờ lúc app đang nền, user mở lại sau 2 phút
+    advance(FOCUS + minutesToMs(2));
+    useTimerStore.getState().sync();
+
+    const s = useTimerStore.getState();
+    expect(s.phase).toBe('shortBreak');
+    expect(s.status).toBe('running');
+    // Giờ nghỉ trôi theo đồng hồ thật: hết lúc 9:30, không phải 9:32
+    expect(s.endAt).toBe(focusEnd + minutesToMs(5));
+    expect(s.remainingMs).toBe(minutesToMs(3));
+    // Vòng tiến trình phải thấy giờ nghỉ đã chạy được 2/5
+    expect(s.plannedMs).toBe(minutesToMs(5));
+  });
+
+  it('autoBreak: ngủ qua hết khoảng nghỉ thì không dựng phiên nghỉ mới, về màn tổng kết', () => {
+    setFlags({ autoBreak: true });
+    useTimerStore.getState().start();
+
+    // Hết phiên lúc 9:25, giờ nghỉ đáng ra tới 9:30 — user mở app lúc 9:35
+    advance(FOCUS + minutesToMs(10));
+    useTimerStore.getState().sync();
+
+    const s = useTimerStore.getState();
+    expect(s.phase).toBe('focus');
+    expect(s.status).toBe('completed');
+    expect(s.endAt).toBeNull();
+    expect(useStatsStore.getState().sessions).toHaveLength(1);
+  });
+
+  it('autoBreak: ngủ qua đêm thì về phiên 1 sẵn sàng, không nghỉ cũng không chạy', () => {
+    setFlags({ autoBreak: true });
+    now = NINE_AM;
+    useTimerStore.setState({ sessionNo: 3 });
+    useTimerStore.getState().start();
+
+    now = NEXT_MORNING;
+    useTimerStore.getState().sync();
+
+    const s = useTimerStore.getState();
+    expect(s.phase).toBe('focus');
+    expect(s.status).toBe('idle');
+    expect(s.sessionNo).toBe(1);
+  });
+
+  it('autoStart: hết nghỉ từ đêm qua thì không tự chạy phiên mới', () => {
+    now = NINE_AM;
+    useTimerStore.getState().startBreak();
+
+    now = NEXT_MORNING;
+    useTimerStore.getState().sync();
+
+    const s = useTimerStore.getState();
+    expect(s.phase).toBe('focus');
+    expect(s.status).toBe('idle');
+    expect(s.remainingMs).toBe(FOCUS);
+  });
+
+  it('autoStart: hết nghỉ vài phút trước thì vẫn chạy tiếp — mốc còn ấm', () => {
+    now = NINE_AM;
+    useTimerStore.getState().startBreak();
+
+    advance(minutesToMs(6));
+    useTimerStore.getState().sync();
+
+    expect(useTimerStore.getState().status).toBe('running');
   });
 });
 
@@ -234,6 +312,42 @@ describe('timerStore — chế độ basic (không set, không phiên)', () => {
     const s = useTimerStore.getState();
     expect(s.phase).toBe('shortBreak');
     expect(s.plannedMs).toBe(minutesToMs(5));
+  });
+
+  it('bật autoBreak cũng không vào nghỉ — hết phiên là dừng ở màn tổng kết', () => {
+    setFlags({ basicMode: true, autoBreak: true });
+    useTimerStore.getState().start();
+
+    advance(FOCUS + 400);
+    useTimerStore.getState().sync();
+
+    const s = useTimerStore.getState();
+    expect(s.status).toBe('completed');
+    expect(s.phase).toBe('focus');
+    expect(s.endAt).toBeNull();
+    // Phiên vẫn phải được ghi log đầy đủ như mọi phiên hết giờ khác
+    expect(useStatsStore.getState().sessions).toHaveLength(1);
+  });
+
+  it('gạt công tắc lên giữa một phiên nghỉ đang đếm thì cắt phiên nghỉ đó', () => {
+    useTimerStore.getState().startBreak();
+    expect(useTimerStore.getState().phase).toBe('shortBreak');
+
+    setFlags({ basicMode: true });
+    useTimerStore.getState().applyBasicMode();
+
+    const s = useTimerStore.getState();
+    expect(s.phase).toBe('focus');
+    expect(s.status).toBe('idle');
+    expect(s.remainingMs).toBe(FOCUS);
+  });
+
+  it('không bật basic thì applyBasicMode() không chạm vào phiên nghỉ', () => {
+    useTimerStore.getState().startBreak();
+    useTimerStore.getState().applyBasicMode();
+
+    expect(useTimerStore.getState().phase).toBe('shortBreak');
+    expect(useTimerStore.getState().status).toBe('running');
   });
 
   it('hết nghỉ không đếm sang phiên kế tiếp', () => {

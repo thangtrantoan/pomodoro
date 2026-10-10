@@ -84,12 +84,47 @@ interface TimerState {
   toggle: () => void;
   /** Kết thúc phiên focus sớm — ghi log là phiên chưa hoàn thành */
   endEarly: () => void;
-  startBreak: () => void;
+  /**
+   * Vào phiên nghỉ. `since` là mốc phiên nghỉ **đáng ra** bắt đầu, mặc định là bây giờ —
+   * đúng cho user tự bấm Nghỉ ở màn Done. `autoBreak` thì truyền mốc phiên focus kết thúc
+   * vào đây: app có thể đã ngủ qua mốc đó từ lâu, mà một phiên nghỉ 5 phút tính từ *bây
+   * giờ* cho một phiên focus chết từ đêm qua là sai — giờ nghỉ phải trôi theo đồng hồ thật.
+   *
+   * Trả về `false` khi cả khoảng nghỉ đã trôi qua hết: không còn gì để đếm, caller tự
+   * quyết định đi đâu.
+   */
+  startBreak: (since?: number) => boolean;
   skipBreak: () => void;
   /** "End set for today" — về phiên 1, không chạy */
   endSet: () => void;
   /** Áp độ dài phiên mới từ Settings (chỉ khi đang không chạy) */
   applyFocusLength: () => void;
+  /**
+   * Gọi sau khi gạt công tắc `basicMode`. Basic mode không có phiên nghỉ, nên bật nó lên
+   * giữa một phiên nghỉ đang đếm thì phiên nghỉ đó phải tắt ngay — không thì user vừa
+   * chọn "không nghỉ" xong vẫn ngồi nhìn đồng hồ nghỉ chạy tiếp.
+   */
+  applyBasicMode: () => void;
+}
+
+/**
+ * Hai mốc có cùng một ngày theo lịch *địa phương* hay không. Mọi quyết định "chuyện này
+ * của hôm nay hay hôm qua" đi qua đây, không so sánh timestamp trực tiếp.
+ */
+function sameLocalDay(a: number, b: number): boolean {
+  return getLocalDateStr(new Date(a)) === getLocalDateStr(new Date(b));
+}
+
+/**
+ * Một mốc chuyển phiên đã trôi qua có còn "ấm" hay không — tức app chỉ vừa ngủ một quãng
+ * ngắn trong cùng buổi, chưa phải là sang một ngày khác.
+ *
+ * Dùng chung cho hai chỗ phải trả lời đúng một câu hỏi: "mốc này còn đáng tự động chạy
+ * tiếp không" — hạn của màn Done, và `autoStart` ở mốc hết nghỉ. Hai chỗ cùng một câu hỏi
+ * thì phải cùng một câu trả lời, lệch nhau là app tự chạy ở chỗ này mà không chạy chỗ kia.
+ */
+function stillWarm(at: number, now: number): boolean {
+  return sameLocalDay(at, now) && now - at < DONE_TTL_MS;
 }
 
 function focusMs(): number {
@@ -186,10 +221,19 @@ export const useTimerStore = create<TimerState>()(
           });
           // Bật autoBreak thì vào nghỉ luôn, không dừng ở màn Done. Đặt sau `set()` để
           // phiên vừa xong đã ghi log và bắn tín hiệu chuông xong xuôi.
-          if (useSettingsStore.getState().flags.autoBreak) {
-            get().startBreak();
-            return;
-          }
+          //
+          // Basic mode không có phiên nghỉ nào cả, nên công tắc này không có chỗ áp dụng:
+          // hết phiên là dừng ở màn Done, user tự bấm phiên mới. Chặn ở đây chứ không chỉ
+          // ẩn công tắc trong Settings — cờ đã bật từ trước lúc còn ở chế độ đầy đủ thì
+          // vẫn còn nguyên trong máy.
+          //
+          // `endAt` chứ không phải `now`: giờ nghỉ phải trôi theo đồng hồ thật kể từ lúc
+          // phiên focus hết, không phải kể từ lúc user mở lại app. Mở app ra sau hai phút
+          // thì còn ba phút nghỉ; ngủ qua cả khoảng nghỉ thì `startBreak()` không nhận và
+          // rơi xuống `expireDone()` như khi tắt autoBreak — không dựng một phiên nghỉ mới
+          // toanh cho một phiên focus đã chết từ đêm qua.
+          const { autoBreak, basicMode } = useSettingsStore.getState().flags;
+          if (autoBreak && !basicMode && get().startBreak(endAt)) return;
           // Hết giờ từ lâu rồi mới mở app: màn Done quá hạn ngay lúc sinh ra. Rà ngay tại
           // đây — đợi nhịp `sync()` kế tiếp thì nó kịp loé lên một frame.
           get().expireDone();
@@ -200,7 +244,10 @@ export const useTimerStore = create<TimerState>()(
         // không tính từ mốc cũ — nếu không user sẽ mở app ra và thấy phiên đã trôi mất.
         if (fresh) set({ endedTick: get().endedTick + 1 });
         get().skipBreak();
-        if (useSettingsStore.getState().flags.autoStart) get().start();
+        // Chỉ tự chạy khi mốc hết nghỉ còn ấm — cùng một ngưỡng với hạn của màn Done. Ngủ
+        // qua đêm rồi mở app ra mà thấy một phiên 25 phút đã đang chạy là app tự quyết hộ
+        // user một việc user chưa chọn.
+        if (useSettingsStore.getState().flags.autoStart && stillWarm(endAt, now)) get().start();
       },
 
       start: () => {
@@ -259,12 +306,11 @@ export const useTimerStore = create<TimerState>()(
         }
 
         const now = Date.now();
-        const sameDay = getLocalDateStr(new Date(completedAt)) === getLocalDateStr(new Date(now));
-        if (sameDay && now - completedAt < DONE_TTL_MS) return;
+        if (stillWarm(completedAt, now)) return;
 
         // Còn trong ngày thì set vẫn đang dở: phiên nghỉ không ai bấm tính như đã nghỉ xong
         // nên sang phiên kế tiếp. Sang ngày mới thì set hôm qua đã đóng — về phiên 1.
-        if (sameDay) get().skipBreak();
+        if (sameLocalDay(completedAt, now)) get().skipBreak();
         else get().endSet();
       },
 
@@ -282,7 +328,7 @@ export const useTimerStore = create<TimerState>()(
         const now = Date.now();
         // Còn trong ngày thì tạm dừng bao lâu cũng là chuyện của user — đi họp hai tiếng về
         // bấm Tiếp tục là quyền của họ. Chỉ sang ngày mới mới coi là đã bỏ.
-        if (getLocalDateStr(new Date(stoppedAt)) === getLocalDateStr(new Date(now))) return;
+        if (sameLocalDay(stoppedAt, now)) return;
 
         // Phiên nghỉ treo qua đêm thì không có gì để ghi — nghỉ không vào log
         if (phase === 'focus' && elapsed >= MIN_LOGGED_MS) {
@@ -291,7 +337,7 @@ export const useTimerStore = create<TimerState>()(
         get().endSet();
       },
 
-      startBreak: () => {
+      startBreak: (since) => {
         const { sessionNo } = get();
         const { sessionsPerSet, flags } = useSettingsStore.getState();
         // Basic mode không có set thì cũng không có "hết set" — mọi phiên nghỉ là nghỉ ngắn
@@ -299,16 +345,25 @@ export const useTimerStore = create<TimerState>()(
           !flags.basicMode && sessionNo >= sessionsPerSet ? 'longBreak' : 'shortBreak';
         const planned = breakMsFor(phase);
 
+        const now = Date.now();
+        const endsAt = (since ?? now) + planned;
+        // Khoảng nghỉ đã trôi qua hết thì không còn phiên nghỉ nào để vào
+        if (endsAt <= now) return false;
+
         set({
           phase,
           status: 'running',
+          // `plannedMs` vẫn là cả độ dài phiên nghỉ, không phải phần còn lại: vòng tiến
+          // trình ở màn Break đọc `1 - remaining/planned`, nên vào giữa giờ nghỉ phải thấy
+          // vòng đã chạy được một phần, chứ không phải bắt đầu lại từ 0.
           plannedMs: planned,
-          remainingMs: planned,
-          endAt: Date.now() + planned,
+          remainingMs: endsAt - now,
+          endAt: endsAt,
           startedAt: null,
           completedAt: null,
           pausedAt: null,
         });
+        return true;
       },
 
       skipBreak: () => {
@@ -356,6 +411,12 @@ export const useTimerStore = create<TimerState>()(
         if (phase !== 'focus' || status === 'running' || status === 'paused') return;
         const planned = focusMs();
         set({ plannedMs: planned, remainingMs: planned });
+      },
+
+      applyBasicMode: () => {
+        if (!useSettingsStore.getState().flags.basicMode) return;
+        if (get().phase === 'focus') return;
+        get().skipBreak();
       },
     }),
     {

@@ -30,8 +30,8 @@ const en = {
     body: 'No projects, no tags, no scoring. One task at a time and one button. Everything else is a setting you will set once.',
     begin: 'Begin',
     metaLengths: (focus: number, short: number, long: number) => `${focus} / ${short} / ${long}`,
-    /** Basic mode: không có nghỉ dài nên không in số thứ ba */
-    metaLengthsBasic: (focus: number, short: number) => `${focus} / ${short}`,
+    /** Basic mode: không có phiên nghỉ nào nên chỉ còn một con số */
+    metaLengthsBasic: (focus: number) => `${focus} minutes`,
     metaPerSet: (n: number) => `${n} per set`,
     metaChange: 'Change in settings',
   },
@@ -70,6 +70,8 @@ const en = {
     // Basic mode không có việc để "against" cũng không có set để định vị — một câu thay cả ba mảnh
     bodyBasic: (duration: string) => `${duration} of focus, logged.`,
     takeBreak: (minutes: number) => `Take the ${minutes}-minute break`,
+    /** Basic mode thay nút nghỉ: về đồng hồ ở trạng thái sẵn sàng, không tự chạy */
+    newSession: 'New session',
     endSet: 'End set for today',
     endDay: 'Done for today',
     sessionsToday: 'Sessions today',
@@ -103,7 +105,7 @@ const en = {
     focusLength: 'Focus length',
     minutes: (n: number) => `${n}m`,
     basicMode: 'Basic mode',
-    basicModeHint: 'One length, one button — no session count, no long break, no task list',
+    basicModeHint: 'One length, one button — no break, no session count, no task list',
     autoStart: 'Start next session automatically',
     autoStartHint: 'No decision at the break boundary',
     autoBreak: 'Start the break automatically',
@@ -148,8 +150,8 @@ const en = {
   notification: {
     focusDone: 'Session done',
     focusDoneBody: (task: string) => `${task} — take the break.`,
-    /** Basic mode: không có tên việc nào để nhắc */
-    focusDoneBodyPlain: 'Take the break.',
+    /** Basic mode: không có tên việc để nhắc, cũng không có phiên nghỉ để mời */
+    focusDoneBodyPlain: 'Logged. Start the next one when you want.',
     breakDone: 'Break over',
     breakDoneBody: 'Back to it.',
     ongoing: 'Interval · focusing',
@@ -182,7 +184,7 @@ const vi: typeof en = {
     body: 'Không dự án, không thẻ, không chấm điểm. Mỗi lần một việc và một cái nút. Mọi thứ còn lại là cài đặt bạn chỉ chỉnh một lần.',
     begin: 'Bắt đầu',
     metaLengths: (focus: number, short: number, long: number) => `${focus} / ${short} / ${long}`,
-    metaLengthsBasic: (focus: number, short: number) => `${focus} / ${short}`,
+    metaLengthsBasic: (focus: number) => `${focus} phút`,
     metaPerSet: (n: number) => `${n} phiên mỗi set`,
     metaChange: 'Đổi trong cài đặt',
   },
@@ -218,6 +220,7 @@ const vi: typeof en = {
     position: (n: number, total: number) => `Phiên ${n} / ${total} của set này.`,
     bodyBasic: (duration: string) => `Đã ghi ${duration} tập trung.`,
     takeBreak: (minutes: number) => `Nghỉ ${minutes} phút`,
+    newSession: 'Phiên mới',
     endSet: 'Kết thúc set hôm nay',
     endDay: 'Xong hôm nay',
     sessionsToday: 'Phiên hôm nay',
@@ -252,7 +255,7 @@ const vi: typeof en = {
     minutes: (n: number) => `${n}p`,
     basicMode: 'Chế độ đơn giản',
     basicModeHint:
-      'Một độ dài, một cái nút — không đếm phiên, không nghỉ dài, không danh sách việc',
+      'Một độ dài, một cái nút — không phiên nghỉ, không đếm phiên, không danh sách việc',
     autoStart: 'Tự bắt đầu phiên tiếp theo',
     autoStartHint: 'Không phải quyết định gì lúc hết giờ nghỉ',
     autoBreak: 'Tự bắt đầu phiên nghỉ',
@@ -296,7 +299,7 @@ const vi: typeof en = {
   notification: {
     focusDone: 'Hết phiên',
     focusDoneBody: (task: string) => `${task} — nghỉ một chút.`,
-    focusDoneBodyPlain: 'Nghỉ một chút.',
+    focusDoneBodyPlain: 'Đã ghi lại. Bấm Bắt đầu khi nào bạn muốn.',
     breakDone: 'Hết giờ nghỉ',
     breakDoneBody: 'Quay lại làm việc thôi.',
     ongoing: 'Interval · đang tập trung',

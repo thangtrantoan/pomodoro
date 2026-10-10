@@ -69,6 +69,7 @@ export default function SettingsRoute() {
   const flags = useSettingsStore((st) => st.flags);
   const toggleFlag = useSettingsStore((st) => st.toggleFlag);
   const applyToTimer = useTimerStore((st) => st.applyFocusLength);
+  const applyBasicMode = useTimerStore((st) => st.applyBasicMode);
   const notificationsGranted = useNotificationPermission();
 
   const sound = useAudioStore((st) => st.sound);
@@ -99,17 +100,32 @@ export default function SettingsRoute() {
         ]
       : [];
 
+  // Cả hai công tắc này chỉ sống ở hai mốc của phiên nghỉ — `autoBreak` ở lúc vào nghỉ,
+  // `autoStart` ở lúc hết nghỉ. Basic mode không có phiên nghỉ nên không mốc nào tới:
+  // ẩn hẳn thay vì để hai công tắc gạt bật hay tắt cũng như nhau.
+  const breakRows: ToggleRow[] = flags.basicMode
+    ? []
+    : [
+        { key: 'autoStart', label: t.settings.autoStart, hint: t.settings.autoStartHint },
+        { key: 'autoBreak', label: t.settings.autoBreak, hint: t.settings.autoBreakHint },
+      ];
+
   const toggles: ToggleRow[] = [
     // Đặt đầu nhóm: đây là công tắc quyết định app có bao nhiêu thứ, không phải một tuỳ
     // chọn ngang hàng với các công tắc hành vi bên dưới
     { key: 'basicMode', label: t.settings.basicMode, hint: t.settings.basicModeHint },
-    { key: 'autoStart', label: t.settings.autoStart, hint: t.settings.autoStartHint },
-    { key: 'autoBreak', label: t.settings.autoBreak, hint: t.settings.autoBreakHint },
+    ...breakRows,
     { key: 'notify', label: t.settings.notify, hint: t.settings.notifyHint },
     { key: 'chime', label: t.settings.chime, hint: t.settings.chimeHint },
     ...ongoingRow,
     { key: 'keepAwake', label: t.settings.keepAwake, hint: t.settings.keepAwakeHint },
   ];
+
+  const handleToggle = (key: FlagKey) => {
+    toggleFlag(key);
+    // Bật basic mode giữa một phiên nghỉ đang đếm thì phiên nghỉ đó phải tắt theo
+    if (key === 'basicMode') applyBasicMode();
+  };
 
   const handleFocusLength = (value: string) => {
     setFocusMinutes(Number(value) as FocusMinutes);
@@ -156,7 +172,7 @@ export default function SettingsRoute() {
             label={item.label}
             hint={item.hint}
             value={flags[item.key]}
-            onToggle={() => toggleFlag(item.key)}
+            onToggle={() => handleToggle(item.key)}
             disabled={item.disabled}
           />
         ))}
@@ -210,7 +226,8 @@ export default function SettingsRoute() {
         ))}
 
         {/* Âm lượng chỉ có nghĩa khi đã chọn một nguồn. Công tắc giờ nghỉ thì chỉ có nghĩa với
-            tick — nhạc nền không bao giờ phát trong giờ nghỉ, xem `useSoundActive`. */}
+            tick — nhạc nền không bao giờ phát trong giờ nghỉ, xem `useSoundActive` — và chỉ
+            khi còn giờ nghỉ để nói tới, tức không phải basic mode. */}
         {sound !== null ? (
           <>
             <View style={[s.block, { paddingTop: spacing.xl }]}>
@@ -226,7 +243,7 @@ export default function SettingsRoute() {
               />
             </View>
 
-            {sound.kind === 'tick' ? (
+            {sound.kind === 'tick' && !flags.basicMode ? (
               <Toggle
                 label={t.sound.tickInBreak}
                 hint={t.sound.tickInBreakHint}

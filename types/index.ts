@@ -22,9 +22,13 @@ export const FOCUS_LENGTHS: readonly FocusMinutes[] = [15, 25, 45, 50] as const;
 /**
  * Các công tắc trong Settings — mỗi cái nối vào một hành vi thật, xem utils/notifications.ts.
  *
- * `basicMode` là công tắc gộp, không phải một hành vi đơn: nó vừa bỏ cấu trúc set (không
- * đếm phiên, không nghỉ dài) vừa ẩn phần việc cần làm. Hai thứ đó đi với nhau vì cùng trả
- * lời một câu hỏi — "app này có nhiều hơn một đồng hồ hay không".
+ * `basicMode` là công tắc gộp, không phải một hành vi đơn: nó bỏ hẳn phiên nghỉ, bỏ cấu
+ * trúc set (không đếm phiên, không nghỉ dài) và ẩn phần việc cần làm. Ba thứ đó đi với
+ * nhau vì cùng trả lời một câu hỏi — "app này có nhiều hơn một đồng hồ hay không".
+ *
+ * Không còn phiên nghỉ thì `autoBreak` (mốc vào nghỉ) và `autoStart` (mốc hết nghỉ) không
+ * có chỗ áp dụng — `app/settings.tsx` ẩn cả hai, và `store/timerStore.ts` không đọc tới
+ * chúng nữa, vì cờ bật từ hồi còn ở chế độ đầy đủ vẫn còn nguyên trong máy.
  *
  * `notify` tắt hẳn notification hết phiên, còn `chime` chỉ quyết định phiên đó có *tiếng*
  * hay không. Tách đôi vì hai thứ chết theo hai cách khác nhau: tắt tiếng thì vẫn thấy

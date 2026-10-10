@@ -63,6 +63,15 @@ export function DoneScreen() {
     startBreak();
   };
 
+  // Basic mode không có phiên nghỉ: màn này chỉ là tổng kết, nút chính đưa đồng hồ về
+  // trạng thái sẵn sàng rồi dừng lại ở đó — chạy tiếp hay không là việc của user.
+  // `endSet()` mà không điều hướng: `app/index.tsx` tự đổi sang `TimerScreen` khi
+  // `status` rời `completed`.
+  const handleNewSession = () => {
+    tapFeedback();
+    endSet();
+  };
+
   const handleEndSet = () => {
     endSet();
     // Design: "End set for today" dẫn thẳng sang màn thống kê
@@ -102,8 +111,8 @@ export function DoneScreen() {
       </View>
 
       <View style={s.footer}>
-        <Button height={56} onPress={handleBreak}>
-          {t.done.takeBreak(breakMinutes)}
+        <Button height={56} onPress={basicMode ? handleNewSession : handleBreak}>
+          {basicMode ? t.done.newSession : t.done.takeBreak(breakMinutes)}
         </Button>
         <Button variant="ghost" height={40} onPress={handleEndSet}>
           {basicMode ? t.done.endDay : t.done.endSet}

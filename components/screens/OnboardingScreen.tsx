@@ -50,11 +50,11 @@ export function OnboardingScreen() {
         {t.onboarding.begin}
       </Button>
 
-      {/* Dòng meta phải nói đúng cấu hình đang có: basic mode thì không có nghỉ dài lẫn set */}
+      {/* Dòng meta phải nói đúng cấu hình đang có: basic mode thì không có nghỉ lẫn set */}
       <View style={s.meta}>
         <Text style={s.metaText}>
           {basicMode
-            ? t.onboarding.metaLengthsBasic(focusMinutes, shortBreakMinutes)
+            ? t.onboarding.metaLengthsBasic(focusMinutes)
             : t.onboarding.metaLengths(focusMinutes, shortBreakMinutes, longBreakMinutes)}
         </Text>
         <Text style={s.metaText}>·</Text>
